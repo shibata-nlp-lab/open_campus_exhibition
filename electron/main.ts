@@ -9,9 +9,11 @@ import {
   ensureDirs,
   importAsset,
   loadConfig,
+  readCache,
   readResults,
   saveConfig,
   userDir,
+  writeCache,
 } from './config';
 import { embed, nextTokenCandidates, verifyKey } from './openai';
 import type { ApiResult, AppConfig, DisplayInfo, PlaybackCommand, PlaybackState } from '../src/types';
@@ -318,6 +320,13 @@ function registerIpc() {
   });
   ipcMain.handle('file:reveal', (_e, abs: string) => {
     if (fs.existsSync(abs)) shell.showItemInFolder(abs);
+  });
+
+  /* --- 汎用キャッシュ（埋め込みの再取得を避ける） --- */
+  ipcMain.handle('cache:read', (_e, key: string) => readCache(key));
+  ipcMain.handle('cache:write', (_e, args: { key: string; text: string }) => {
+    writeCache(args.key, args.text);
+    return true;
   });
 
   /* --- API キー --- */

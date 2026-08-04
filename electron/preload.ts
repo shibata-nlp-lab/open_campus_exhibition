@@ -45,6 +45,10 @@ const api = {
     /** 絶対パスをレンダラから参照できる URL に変換 */
     url: (abs: string) => `ocfile://local/${encodeURIComponent(abs)}`,
   },
+  cache: {
+    read: (key: string): Promise<string | null> => ipcRenderer.invoke('cache:read', key),
+    write: (key: string, text: string): Promise<boolean> => ipcRenderer.invoke('cache:write', { key, text }),
+  },
   key: {
     status: (): Promise<{ saved: boolean; encrypted: boolean }> => ipcRenderer.invoke('key:status'),
     set: (key: string): Promise<boolean> => unwrap(ipcRenderer.invoke('key:set', key)),

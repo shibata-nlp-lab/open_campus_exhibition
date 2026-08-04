@@ -9,9 +9,28 @@ export const assetsDir = () => path.join(userDir(), 'assets');
 export const configPath = () => path.join(userDir(), 'config.json');
 export const resultsPath = () => path.join(userDir(), 'results.jsonl');
 
+export const cacheDir = () => path.join(userDir(), 'cache');
+
 export function ensureDirs() {
   fs.mkdirSync(assetsDir(), { recursive: true });
+  fs.mkdirSync(cacheDir(), { recursive: true });
 }
+
+/** 埋め込みなど再取得の高い結果を userData/cache に置く */
+export function readCache(key: string): string | null {
+  try {
+    return fs.readFileSync(path.join(cacheDir(), `${sanitizeKey(key)}.json`), 'utf-8');
+  } catch {
+    return null;
+  }
+}
+
+export function writeCache(key: string, text: string) {
+  ensureDirs();
+  fs.writeFileSync(path.join(cacheDir(), `${sanitizeKey(key)}.json`), text, 'utf-8');
+}
+
+const sanitizeKey = (key: string) => key.replace(/[^\w.-]/g, '_').slice(0, 120);
 
 /** v1 時代の初期サンプルの名前。これしか入っていなければユーザーの作業はないとみなす */
 const V1_SAMPLE_CONTENT_NAMES = new Set([
@@ -61,6 +80,7 @@ function migrate(config: AppConfig): AppConfig {
     for (const s of config.scenarios) s.steps = s.steps.filter((st) => !removed.includes(st.contentId));
   }
   for (const c of config.contents) {
+    if (c.type === 'interactive1') c.neighbourSource ??= 'curated';
     if (c.type === 'slide') {
       c.markdownSource ??= 'inline';
       c.externalPath ??= null;

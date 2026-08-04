@@ -47,6 +47,8 @@ export function pca2(vectors: number[][]): Array<[number, number]> {
 }
 
 export function cosine(a: number[], b: number[]) {
+  // 次元が違うベクトルを比べても意味がない（NaN の温床になる）ので 0 を返す
+  if (!a?.length || !b?.length || a.length !== b.length) return 0;
   return dot(a, b) / (norm(a) * norm(b));
 }
 
@@ -61,17 +63,6 @@ export function pseudoEmbed(text: string, dim = 64): number[] {
   }
   const n = norm(v);
   return v.map((x) => x / n);
-}
-
-/** -1..1 の値を青→白→赤のヒートマップ色に */
-export function heatColor(x: number) {
-  const t = Math.max(-1, Math.min(1, x * 3));
-  if (t >= 0) {
-    const p = t;
-    return `rgb(${255}, ${Math.round(255 - 120 * p)}, ${Math.round(255 - 200 * p)})`;
-  }
-  const p = -t;
-  return `rgb(${Math.round(255 - 200 * p)}, ${Math.round(255 - 90 * p)}, 255)`;
 }
 
 /** トークンごとの識別色 */

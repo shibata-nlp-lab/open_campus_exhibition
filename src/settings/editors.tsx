@@ -469,6 +469,37 @@ function Interactive1Editor({ c, patch }: { c: Interactive1Content; patch: Patch
         <input className="input" value={c.placeholder} onChange={(e) => patch((x) => void (x.placeholder = e.target.value))} />
       </Field>
       <ExamplesField examples={c.examples} onChange={(v) => patch((x) => void (x.examples = v))} />
+
+      <Field
+        label="「意味が近いことば」を探す対象"
+        hint="来場者がトークンを選んだとき、どの語の集まりの中から近いものを探すかを決めます。"
+      >
+        <select
+          className="select"
+          value={c.neighbourSource ?? 'curated'}
+          onChange={(e) => patch((x) => void (x.neighbourSource = e.target.value as Interactive1Content['neighbourSource']))}
+        >
+          <option value="curated">辞書（同梱の厳選語彙・約120語）</option>
+          <option value="tokenizer">o200k_base から抽出した日本語（約1,840語）</option>
+        </select>
+      </Field>
+      {(c.neighbourSource ?? 'curated') === 'tokenizer' ? (
+        <div className="banner warn" style={{ marginBottom: 14 }}>
+          GPT-4o のトークナイザが実際に持つ語彙から探します。「かな を含む」または「常用漢字のみ（2文字以上）」で
+          抽出し、簡体字の中国語と賭博・アダルト系の語幹を除外して 1,842 語になっています。
+          <br />
+          ただし <span className="mono">天天</span> <span className="mono">提款</span>{' '}
+          のような中国語や、<span className="mono">風吹けば名無し</span>{' '}
+          のような5ch由来の語は残ります（それがトークナイザの実態です）。来場者に見せる前に一度ご自身で試してください。
+          <br />
+          初回だけ埋め込み取得に数秒かかります（結果はディスクに保存され、次回以降は不要）。
+        </div>
+      ) : (
+        <div className="banner ok" style={{ marginBottom: 14 }}>
+          読みやすく安全な結果になります（猫 → 犬・馬・魚・鳥）。語彙は
+          <span className="mono">src/content/vocabulary.ts</span> で編集できます。
+        </div>
+      )}
     </>
   );
 }

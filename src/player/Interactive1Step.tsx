@@ -1,11 +1,64 @@
 import { useMemo, useState } from 'react';
-import type { Interactive1Content } from '../types';
+import type { Interactive1Content, NeighbourSource } from '../types';
 import type { StepProps } from './PlayerApp';
 import { api, errText } from '../lib/api';
-import { tokenize, type Tok } from '../lib/tokenizer';
-import { cosine, heatColor, pca2, pseudoEmbed, tokenBorder, tokenColor } from '../lib/vec';
+import { listJapaneseTokens, tokenize, type Tok } from '../lib/tokenizer';
+import { cosine, pca2, pseudoEmbed, tokenBorder, tokenColor } from '../lib/vec';
+import { VOCABULARY } from '../content/vocabulary';
 
 type Phase = 'input' | 'tokens' | 'vectors';
+
+const EMBED_DIMS = 256;
+
+/**
+ * 候補プール（語とその埋め込み）。
+ * 語数が多い tokenizer 側は取得に時間がかかるので、ディスクにも保存して次回起動時は読むだけにする。
+ */
+interface Pool {
+  words: string[];
+  vectors: number[][];
+  offline: boolean;
+}
+
+const poolMemo = new Map<string, Pool>();
+
+async function poolWords(source: NeighbourSource): Promise<string[]> {
+  return source === 'tokenizer' ? listJapaneseTokens() : VOCABULARY;
+}
+
+async function loadPool(source: NeighbourSource, model: string): Promise<Pool> {
+  const cacheKey = `emb_${source}_${model}_${EMBED_DIMS}`;
+  const memo = poolMemo.get(cacheKey);
+  if (memo) return memo;
+
+  const words = await poolWords(source);
+
+  // ディスクキャッシュ（語数と語の内容が一致するときだけ使う）
+  try {
+    const raw = await api.cache.read(cacheKey);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { words: string[]; vectors: number[][] };
+      if (parsed.words.length === words.length && parsed.words[0] === words[0]) {
+        const pool = { words: parsed.words, vectors: parsed.vectors, offline: false };
+        poolMemo.set(cacheKey, pool);
+        return pool;
+      }
+    }
+  } catch {
+    /* 壊れていたら取り直す */
+  }
+
+  let pool: Pool;
+  try {
+    pool = { words, vectors: await api.openai.embed(words, model, EMBED_DIMS), offline: false };
+    api.cache.write(cacheKey, JSON.stringify({ words: pool.words, vectors: pool.vectors })).catch(() => {});
+  } catch {
+    // 次元をそろえないと類似度が NaN になるので、疑似ベクトルも同じ次元で作る
+    pool = { words, vectors: words.map((w) => pseudoEmbed(w, EMBED_DIMS)), offline: true };
+  }
+  poolMemo.set(cacheKey, pool);
+  return pool;
+}
 
 export default function Interactive1Step({ content, config, onFinish }: StepProps<Interactive1Content>) {
   const [text, setText] = useState('');
@@ -13,6 +66,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
   const [tokens, setTokens] = useState<Tok[]>([]);
   const [approx, setApprox] = useState(false);
   const [vectors, setVectors] = useState<number[][] | null>(null);
+  const [pool, setPool] = useState<Pool | null>(null);
   const [offline, setOffline] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,22 +76,35 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
     const t = text.trim();
     if (!t) return;
     const { tokens: toks, approximate } = await tokenize(t);
-    setTokens(toks.slice(0, 60));
+    setTokens(toks.slice(0, 40));
     setApprox(approximate);
+    setSelected(0);
     setPhase('tokens');
   };
 
   const vectorize = async () => {
     setBusy(true);
     setError(null);
+    const model = config.settings.embeddingModel;
+    const source = content.neighbourSource ?? 'curated';
+    const texts = tokens.map((t) => t.text);
     try {
-      const inputs = tokens.map((t) => t.text);
-      const vecs = await api.openai.embed(inputs, config.settings.embeddingModel, 256);
-      setVectors(vecs);
-      setOffline(false);
+      // 先にプールを用意する。プールがオフラインなら入力側もオフラインに揃える
+      // （実埋め込みと疑似ベクトルを混ぜると比較が成立しない）
+      const p = await loadPool(source, model);
+      setPool(p);
+      if (p.offline) {
+        setVectors(texts.map((t) => pseudoEmbed(t, EMBED_DIMS)));
+        setOffline(true);
+      } else {
+        setVectors(await api.openai.embed(texts, model, EMBED_DIMS));
+        setOffline(false);
+      }
     } catch (e) {
       setError(errText(e));
-      setVectors(tokens.map((t) => pseudoEmbed(t.text, 64)));
+      const words = await poolWords(source);
+      setPool({ words, vectors: words.map((w) => pseudoEmbed(w, EMBED_DIMS)), offline: true });
+      setVectors(texts.map((t) => pseudoEmbed(t, EMBED_DIMS)));
       setOffline(true);
     } finally {
       setBusy(false);
@@ -45,18 +112,43 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
     }
   };
 
-  const points = useMemo(() => (vectors ? pca2(vectors) : []), [vectors]);
-
+  /** 選んだトークンに意味が近いことばを、プール全体から探す */
   const neighbours = useMemo(() => {
-    if (!vectors || !vectors[selected]) return [];
-    return vectors
-      .map((v, i) => ({ i, sim: cosine(vectors[selected], v) }))
-      .filter((x) => x.i !== selected)
+    if (!vectors?.[selected] || !pool) return [];
+    const target = vectors[selected];
+    return pool.vectors
+      .map((v, i) => ({ i, word: pool.words[i], sim: cosine(target, v) }))
+      .filter((x) => x.word !== tokens[selected]?.text)
       .sort((a, b) => b.sim - a.sim)
-      .slice(0, 3);
-  }, [vectors, selected]);
+      .slice(0, 5);
+  }, [vectors, pool, selected, tokens]);
 
-  /* ---------- 入力フェーズ ---------- */
+  /**
+   * 地図用のプール。数千語をそのまま描くと潰れるので間引く。
+   * 近傍として選ばれた語は必ず残す。
+   */
+  const mapPool = useMemo(() => {
+    if (!pool) return null;
+    const MAX = 260;
+    const keep = new Set(neighbours.map((n) => n.i));
+    if (pool.words.length > MAX) {
+      const step = Math.ceil(pool.words.length / MAX);
+      for (let i = 0; i < pool.words.length; i += step) keep.add(i);
+    } else {
+      for (let i = 0; i < pool.words.length; i++) keep.add(i);
+    }
+    const idx = [...keep].sort((a, b) => a - b);
+    return { idx, words: idx.map((i) => pool.words[i]), vectors: idx.map((i) => pool.vectors[i]) };
+  }, [pool, neighbours]);
+
+  /** トークンとプールを同じ空間で2次元に落とす */
+  const projected = useMemo(() => {
+    if (!vectors || !mapPool) return null;
+    const all = pca2([...vectors, ...mapPool.vectors]);
+    return { tokens: all.slice(0, vectors.length), vocab: all.slice(vectors.length) };
+  }, [vectors, mapPool]);
+
+  /* ---------- 入力 ---------- */
   if (phase === 'input') {
     return (
       <div className="stage">
@@ -85,7 +177,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
     );
   }
 
-  /* ---------- トークン表示 ---------- */
+  /* ---------- トークン ---------- */
   if (phase === 'tokens') {
     return (
       <div className="stage fade-in">
@@ -93,11 +185,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
         <h2>文章は「トークン」という小さなかたまりに分けられる</h2>
         <div className="token-line">
           {tokens.map((t, i) => (
-            <span
-              key={i}
-              className="token"
-              style={{ background: tokenColor(i), borderColor: tokenBorder(i) }}
-            >
+            <span key={i} className="token" style={{ background: tokenColor(i), borderColor: tokenBorder(i) }}>
               {t.text === ' ' ? '␣' : t.text}
               <span className="id">{t.id}</span>
             </span>
@@ -118,10 +206,12 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
     );
   }
 
-  /* ---------- ベクトル表示 ---------- */
+  /* ---------- ベクトル ---------- */
   const vec = vectors?.[selected] ?? [];
+  const selectedText = tokens[selected]?.text ?? '';
+
   return (
-    <div className="stage fade-in" style={{ gap: 16 }}>
+    <div className="stage scroll fade-in" style={{ gap: 14 }}>
       <span className="chip">STEP 2 — ベクトル化（埋め込み）</span>
       <h2>トークンは「意味を表す数字の列」になる</h2>
 
@@ -150,35 +240,67 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
         ))}
       </div>
 
-      <div className="row" style={{ alignItems: 'flex-start', gap: 40, flexWrap: 'wrap', justifyContent: 'center' }}>
-        <div>
-          <div className="small muted" style={{ marginBottom: 8 }}>
-            「{tokens[selected]?.text}」のベクトル（先頭 96 次元）
-          </div>
-          <div className="vec-grid">
-            {vec.slice(0, 96).map((v, i) => (
-              <div key={i} className="vec-cell" style={{ background: heatColor(v) }} title={v.toFixed(4)} />
-            ))}
-          </div>
-          <div className="small muted mono" style={{ marginTop: 8 }}>
-            [{vec.slice(0, 4).map((v) => v.toFixed(3)).join(', ')}, … ] 全 {vec.length} 次元
-          </div>
-          {neighbours.length > 0 && (
-            <div className="small muted" style={{ marginTop: 12 }}>
-              意味が近いトークン:{' '}
-              {neighbours.map((n) => `${tokens[n.i].text}(${(n.sim * 100).toFixed(0)}%)`).join('  ')}
-            </div>
-          )}
+      <div className="vec-numbers">
+        <div className="small muted">
+          「{selectedText}」は、こんな <b>{vec.length} 次元のベクトル</b> になっている
         </div>
-
-        <div>
-          <div className="small muted" style={{ marginBottom: 8 }}>意味の地図（主成分分析で2次元に圧縮）</div>
-          <Scatter points={points} labels={tokens.map((t) => t.text)} selected={selected} onSelect={setSelected} />
+        <div className="vector">
+          <span className="brk left" />
+          <div className="vector-items">
+            {vec.slice(0, 6).map((v, i) => (
+              <span key={i} className={`vec-num ${v >= 0 ? 'pos' : 'neg'}`}>
+                {v >= 0 ? '+' : '−'}
+                {Math.abs(v).toFixed(3)}
+              </span>
+            ))}
+            <span className="vec-tail">
+              <span className="vec-dots">⋯</span>
+              <span className="vec-rest">あと {Math.max(0, vec.length - 6)} 個</span>
+            </span>
+          </div>
+          <span className="brk right" />
         </div>
       </div>
 
-      <p className="lead" style={{ maxWidth: 900 }}>
-        近い意味のことばは、近い場所に配置されます。LLMはこの数字の並びだけを見て計算しています。
+      {neighbours.length > 0 && (
+        <div className="neighbours">
+          <div className="small muted">
+            「{selectedText}」に意味が近いことば（
+            {pool ? pool.words.length.toLocaleString() : 0} 語の中から /{' '}
+            {(content.neighbourSource ?? 'curated') === 'tokenizer' ? 'o200k_base のトークン' : '辞書'}）
+          </div>
+          <div className="row" style={{ justifyContent: 'center', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
+            {neighbours.map((n) => (
+              <span key={n.word} className="neighbour">
+                {n.word}
+                <b>{(n.sim * 100).toFixed(0)}%</b>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="map-wrap">
+        <div className="small muted" style={{ marginBottom: 6 }}>
+          意味の地図（{mapPool ? mapPool.words.length : 0} 語と一緒に、2次元へ圧縮して配置
+          {pool && mapPool && pool.words.length > mapPool.words.length
+            ? `／全 ${pool.words.length.toLocaleString()} 語から間引き`
+            : ''}
+          ）
+        </div>
+        <Scatter
+          tokenPoints={projected?.tokens ?? []}
+          tokenLabels={tokens.map((t) => t.text)}
+          vocabPoints={projected?.vocab ?? []}
+          vocabLabels={mapPool?.words ?? []}
+          highlight={new Set(neighbours.map((n) => mapPool?.idx.indexOf(n.i) ?? -1).filter((i) => i >= 0))}
+          selected={selected}
+          onSelect={setSelected}
+        />
+      </div>
+
+      <p className="lead" style={{ maxWidth: 1000 }}>
+        近い意味のことばは、近い場所に集まります。LLMはこの数字の並びだけを見て計算しています。
       </p>
       <div className="row">
         <button className="btn lg" onClick={() => setPhase('input')}>もう一度</button>
@@ -189,40 +311,64 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
 }
 
 function Scatter({
-  points,
-  labels,
+  tokenPoints,
+  tokenLabels,
+  vocabPoints,
+  vocabLabels,
+  highlight,
   selected,
   onSelect,
 }: {
-  points: Array<[number, number]>;
-  labels: string[];
+  tokenPoints: Array<[number, number]>;
+  tokenLabels: string[];
+  vocabPoints: Array<[number, number]>;
+  vocabLabels: string[];
+  highlight: Set<number>;
   selected: number;
   onSelect: (i: number) => void;
 }) {
-  const W = 420;
-  const H = 300;
-  const pad = 30;
-  if (points.length === 0) return <svg className="scatter" width={W} height={H} />;
-  const xs = points.map((p) => p[0]);
-  const ys = points.map((p) => p[1]);
+  const W = 1000;
+  const H = 440;
+  const pad = 40;
+  const all = [...tokenPoints, ...vocabPoints];
+  if (all.length === 0) return <svg className="scatter" width="100%" viewBox={`0 0 ${W} ${H}`} />;
+
+  const xs = all.map((p) => p[0]);
+  const ys = all.map((p) => p[1]);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
   const sx = (x: number) => pad + ((x - minX) / (maxX - minX || 1)) * (W - pad * 2);
   const sy = (y: number) => H - pad - ((y - minY) / (maxY - minY || 1)) * (H - pad * 2);
 
   return (
-    <svg className="scatter" width={W} height={H}>
-      {points.map((p, i) => (
-        <g key={i} onClick={() => onSelect(i)} style={{ cursor: 'pointer' }}>
+    <svg className="scatter" width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
+      {/* 語彙（背景）。近いと判定されたものだけラベルを出す */}
+      {vocabPoints.map((p, i) => {
+        const on = highlight.has(i);
+        return (
+          <g key={`v${i}`}>
+            <circle cx={sx(p[0])} cy={sy(p[1])} r={on ? 6 : 3} fill={on ? '#6ee7c8' : '#3a4a6b'} opacity={on ? 1 : 0.45} />
+            {on && (
+              <text x={sx(p[0]) + 9} y={sy(p[1]) + 5} fontSize={16} fill="#6ee7c8">
+                {vocabLabels[i]}
+              </text>
+            )}
+          </g>
+        );
+      })}
+      {/* 入力文のトークン（前面） */}
+      {tokenPoints.map((p, i) => (
+        <g key={`t${i}`} onClick={() => onSelect(i)} style={{ cursor: 'pointer' }}>
           <circle
             cx={sx(p[0])}
             cy={sy(p[1])}
-            r={i === selected ? 8 : 5}
-            fill={i === selected ? '#6ee7c8' : '#4c8dff'}
-            opacity={i === selected ? 1 : 0.75}
+            r={i === selected ? 12 : 8}
+            fill="#4c8dff"
+            stroke={i === selected ? '#fff' : 'none'}
+            strokeWidth={2}
           />
-          <text x={sx(p[0]) + 9} y={sy(p[1]) + 4} fontSize={11} fill="#93a2bd">
-            {labels[i]}
+          <text x={sx(p[0]) + 14} y={sy(p[1]) + 7} fontSize={i === selected ? 22 : 18} fill="#e8edf7" fontWeight={600}>
+            {tokenLabels[i]}
           </text>
         </g>
       ))}

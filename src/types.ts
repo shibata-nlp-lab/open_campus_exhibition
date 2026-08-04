@@ -84,11 +84,19 @@ export interface QuizContent extends ContentBase {
   audio: AudioSetting;
 }
 
+/**
+ * 「意味が近いことば」を探す候補プール。
+ * - curated:   同梱の厳選語彙（約120語）。結果が読みやすい
+ * - tokenizer: o200k_base の日本語形トークン（約3,800語）。実物どおりだが中国語・断片・スパム語も混ざる
+ */
+export type NeighbourSource = 'curated' | 'tokenizer';
+
 export interface Interactive1Content extends ContentBase {
   type: 'interactive1';
   prompt: string;
   placeholder: string;
   examples: string[];
+  neighbourSource: NeighbourSource;
 }
 
 export interface Interactive2Content extends ContentBase {
