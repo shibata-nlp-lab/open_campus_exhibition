@@ -2,15 +2,29 @@ import type { TokenCandidate } from '../src/types';
 
 const API_BASE = 'https://api.openai.com/v1';
 
+/** 展示中に固まらないよう、応答が来なければ打ち切る */
+const TIMEOUT_MS = 15000;
+
 async function post(pathname: string, apiKey: string, body: unknown) {
-  const res = await fetch(API_BASE + pathname, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(API_BASE + pathname, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (e) {
+    if (e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError')) {
+      throw new Error(`OpenAI API の応答がありません（${TIMEOUT_MS / 1000}秒でタイムアウト）`);
+    }
+    throw new Error(
+      `OpenAI API に接続できません: ${e instanceof Error ? e.message : String(e)}`
+    );
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     let message = `OpenAI API エラー (${res.status})`;
@@ -80,6 +94,9 @@ export async function embed(
 }
 
 export async function verifyKey(apiKey: string): Promise<boolean> {
-  const res = await fetch(API_BASE + '/models', { headers: { Authorization: `Bearer ${apiKey}` } });
+  const res = await fetch(API_BASE + '/models', {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
   return res.ok;
 }

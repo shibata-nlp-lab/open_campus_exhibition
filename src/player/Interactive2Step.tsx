@@ -33,7 +33,14 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
   const [error, setError] = useState<string | null>(null);
   const alive = useRef(true);
 
-  useEffect(() => () => void (alive.current = false), []);
+  // StrictMode（開発時）は mount → cleanup → 再 mount するため、
+  // 立ち上がりで必ず true に戻さないとフラグが false のままになり応答を捨て続ける
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
 
   const fetchCands = useCallback(
     async (current: string) => {
