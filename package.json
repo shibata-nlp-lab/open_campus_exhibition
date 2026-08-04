@@ -1,0 +1,52 @@
+{
+  "name": "open-campus-llm-exhibit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "オープンキャンパス向け LLM 解説展示アプリ",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "postinstall": "node scripts/fix-macos-electron.mjs",
+    "fix-electron": "node scripts/fix-macos-electron.mjs",
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "start": "npm run build && electron .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dist": "npm run build && electron-builder"
+  },
+  "dependencies": {
+    "js-tiktoken": "^1.0.15",
+    "marked": "^12.0.2",
+    "pdfjs-dist": "^4.4.168",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "electron": "^43.2.0",
+    "electron-builder": "^24.13.3",
+    "esbuild": "^0.23.0",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.0"
+  },
+  "build": {
+    "appId": "jp.ac.lab.opencampus.llm",
+    "productName": "LLM Exhibit",
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.education",
+      "target": [
+        "dmg"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
+  }
+}

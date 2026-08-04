@@ -1,0 +1,26 @@
+# 依存パッケージ（npm install で復元できるためコミットしない）
+node_modules/
+
+# ビルド成果物
+dist/
+release/
+out/
+
+# ログ・一時ファイル
+*.log
+npm-debug.log*
+.cache/
+.tmp/
+
+# OS / エディタ
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# 環境変数（APIキーなど）
+.env
+.env.*
+!.env.example
