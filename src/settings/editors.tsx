@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type React from 'react';
 import type {
   AudioSetting,
   Content,
@@ -220,6 +221,157 @@ function SlideEditor({ c, patch }: { c: SlideContent; patch: Patch<SlideContent>
 
 /* ---------------- クイズ ---------------- */
 
+/**
+ * ドラッグ並べ替えの共通処理。
+ * つまみ（ハンドル）を draggable にし、行そのものをドロップ先にする。
+ */
+function useDragReorder(onReorder: (from: number, to: number) => void) {
+  const [from, setFrom] = useState<number | null>(null);
+  const [over, setOver] = useState<number | null>(null);
+
+  const reset = () => {
+    setFrom(null);
+    setOver(null);
+  };
+
+  /** 行（ドロップ先）に付ける props */
+  const rowProps = (i: number) => ({
+    onDragOver: (e: React.DragEvent) => {
+      if (from === null) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (over !== i) setOver(i);
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      if (from !== null && from !== i) onReorder(from, i);
+      reset();
+    },
+    className: [from === i ? 'dragging' : '', over === i && from !== i ? 'drag-over' : ''].join(' ').trim(),
+  });
+
+  /** つまみに付ける props */
+  const handleProps = (i: number, rowRef: React.RefObject<HTMLElement>) => ({
+    draggable: true,
+    onDragStart: (e: React.DragEvent) => {
+      setFrom(i);
+      e.dataTransfer.effectAllowed = 'move';
+      // 既定だとつまみだけが浮くので、行全体をドラッグ中の見た目にする
+      if (rowRef.current) e.dataTransfer.setDragImage(rowRef.current, 20, 18);
+      // Firefox 等でドラッグを開始させるために何か入れておく
+      e.dataTransfer.setData('text/plain', String(i));
+    },
+    onDragEnd: reset,
+  });
+
+  return { rowProps, handleProps, dragging: from !== null };
+}
+
+/** 並べ替えたときに「正解」が同じ選択肢を指し続けるように補正する */
+function shiftIndex(answer: number, from: number, to: number): number {
+  if (answer === from) return to;
+  if (from < answer && to >= answer) return answer - 1;
+  if (from > answer && to <= answer) return answer + 1;
+  return answer;
+}
+
+function QuizChoiceRow({
+  choice,
+  ci,
+  qi,
+  question,
+  patch,
+  rowProps,
+  handleProps,
+}: {
+  choice: QuizContent['questions'][number]['choices'][number];
+  ci: number;
+  qi: number;
+  question: QuizContent['questions'][number];
+  patch: Patch<QuizContent>;
+  rowProps: (i: number) => Record<string, unknown>;
+  handleProps: (i: number, ref: React.RefObject<HTMLElement>) => Record<string, unknown>;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { className, ...rest } = rowProps(ci) as { className: string };
+  return (
+    <div ref={ref} className={`drag-row ${className}`} {...rest}>
+      <span className="drag-handle" title="ドラッグして並べ替え" {...handleProps(ci, ref)}>
+        ⠿
+      </span>
+      <input
+        type="radio"
+        name={`ans_${question.id}`}
+        checked={question.answerIndex === ci}
+        onChange={() => patch((x) => void (x.questions[qi].answerIndex = ci))}
+        title="正解にする"
+      />
+      <input
+        className="input"
+        value={choice.text}
+        onChange={(e) => patch((x) => void (x.questions[qi].choices[ci].text = e.target.value))}
+      />
+      <button
+        className="btn sm danger"
+        disabled={question.choices.length <= 2}
+        onClick={() =>
+          patch((x) => {
+            const q = x.questions[qi];
+            q.choices.splice(ci, 1);
+            if (q.answerIndex > ci) q.answerIndex -= 1;
+            if (q.answerIndex >= q.choices.length) q.answerIndex = 0;
+          })
+        }
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
+function QuizChoiceList({
+  question,
+  qi,
+  patch,
+}: {
+  question: QuizContent['questions'][number];
+  qi: number;
+  patch: Patch<QuizContent>;
+}) {
+  const { rowProps, handleProps } = useDragReorder((from, to) =>
+    patch((x) => {
+      const q = x.questions[qi];
+      const [item] = q.choices.splice(from, 1);
+      q.choices.splice(to, 0, item);
+      q.answerIndex = shiftIndex(q.answerIndex, from, to);
+    })
+  );
+
+  return (
+    <div className="col" style={{ gap: 6 }}>
+      {question.choices.map((ch, ci) => (
+        <QuizChoiceRow
+          key={ch.id}
+          choice={ch}
+          ci={ci}
+          qi={qi}
+          question={question}
+          patch={patch}
+          rowProps={rowProps}
+          handleProps={handleProps}
+        />
+      ))}
+      <button
+        className="btn sm"
+        onClick={() => patch((x) => void x.questions[qi].choices.push({ id: uid('c'), text: '' }))}
+      >
+        ＋ 選択肢
+      </button>
+    </div>
+  );
+}
+
+
 function QuizEditor({ c, patch }: { c: QuizContent; patch: Patch<QuizContent> }) {
   return (
     <>
@@ -262,37 +414,8 @@ function QuizEditor({ c, patch }: { c: QuizContent; patch: Patch<QuizContent> })
               filters={[{ name: '画像', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }]}
               onChange={(rel) => patch((x) => void (x.questions[qi].imageSrc = rel))}
             />
-            <Field label="選択肢（ラジオで正解を指定）">
-              <div className="col" style={{ gap: 6 }}>
-                {q.choices.map((ch, ci) => (
-                  <div className="row" key={ch.id}>
-                    <input
-                      type="radio"
-                      name={`ans_${q.id}`}
-                      checked={q.answerIndex === ci}
-                      onChange={() => patch((x) => void (x.questions[qi].answerIndex = ci))}
-                    />
-                    <input
-                      className="input"
-                      value={ch.text}
-                      onChange={(e) => patch((x) => void (x.questions[qi].choices[ci].text = e.target.value))}
-                    />
-                    <button
-                      className="btn sm danger"
-                      disabled={q.choices.length <= 2}
-                      onClick={() => patch((x) => {
-                        x.questions[qi].choices.splice(ci, 1);
-                        if (x.questions[qi].answerIndex >= x.questions[qi].choices.length)
-                          x.questions[qi].answerIndex = 0;
-                      })}
-                    >✕</button>
-                  </div>
-                ))}
-                <button
-                  className="btn sm"
-                  onClick={() => patch((x) => void x.questions[qi].choices.push({ id: uid('c'), text: '' }))}
-                >＋ 選択肢</button>
-              </div>
+            <Field label="選択肢（ラジオで正解を指定 / ⠿ をつまんで並べ替え）">
+              <QuizChoiceList question={q} qi={qi} patch={patch} />
             </Field>
             <Field label="解説">
               <textarea

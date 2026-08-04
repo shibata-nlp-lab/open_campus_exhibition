@@ -105,6 +105,21 @@ button, input, textarea, select { font: inherit; color: inherit; }
   display: grid; place-items: center; font-size: 11px; flex: none;
 }
 
+/* ドラッグ並べ替え */
+.drag-row {
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid transparent; border-radius: 8px; padding: 2px;
+  transition: border-color .12s, opacity .12s;
+}
+.drag-row.dragging { opacity: .4; }
+.drag-row.drag-over { border-color: var(--accent); background: #18233c; }
+.drag-handle {
+  cursor: grab; user-select: none; color: var(--fg-dim);
+  padding: 4px 6px; border-radius: 6px; font-size: 15px; line-height: 1;
+}
+.drag-handle:hover { background: var(--bg-3); color: var(--fg); }
+.drag-handle:active { cursor: grabbing; }
+
 table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.data th, table.data td { border-bottom: 1px solid var(--line); padding: 7px 8px; text-align: left; }
 table.data th { color: var(--fg-dim); font-weight: 600; font-size: 11px; }

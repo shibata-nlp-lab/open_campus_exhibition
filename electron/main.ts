@@ -98,6 +98,55 @@ function pickPlayerDisplay(preferExternal: boolean) {
   return external ? { target: external, external: true } : { target: primary, external: false };
 }
 
+/** コントローラの操作を進行画面へ送る */
+function sendToPlayer(cmd: PlaybackCommand) {
+  if (playerWindow && !playerWindow.isDestroyed()) playerWindow.webContents.send('playback:command', cmd);
+}
+
+/**
+ * コントローラのキー操作をメインプロセス側で拾う。
+ * レンダラ内のどこにフォーカスがあっても、IME が有効でも確実に効かせるため
+ * before-input-event（レンダラより先に発火）で処理する。
+ * Space だけはボタンのクリックと二重に反応してしまうのでレンダラ側に任せる。
+ */
+function attachControllerKeys(win: BrowserWindow) {
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || input.meta || input.control || input.alt) return;
+
+    const handled = (fn: () => void) => {
+      event.preventDefault();
+      fn();
+    };
+
+    switch (input.key) {
+      case 'ArrowRight':
+      case 'PageDown':
+        return handled(() => sendToPlayer({ type: 'advance' }));
+      case 'ArrowLeft':
+      case 'PageUp':
+        return handled(() => sendToPlayer({ type: 'back' }));
+      case 'Escape':
+        return handled(() => playerWindow?.close());
+    }
+
+    // input.key は IME の状態によらず物理キーに対応した文字が入る
+    switch (input.key.toLowerCase()) {
+      case 'n':
+        return handled(() => sendToPlayer({ type: 'next' }));
+      case 'p':
+        return handled(() => sendToPlayer({ type: 'prev' }));
+      case 's':
+        return handled(() => sendToPlayer({ type: 'standby' }));
+      case 'r':
+        return handled(() => sendToPlayer({ type: 'restart' }));
+      case 'f':
+        return handled(() => {
+          if (playerWindow && !playerWindow.isDestroyed()) playerWindow.setFullScreen(!playerWindow.isFullScreen());
+        });
+    }
+  });
+}
+
 function createControllerWindow(scenarioId: string) {
   if (controllerWindow && !controllerWindow.isDestroyed()) {
     controllerWindow.focus();
@@ -116,6 +165,7 @@ function createControllerWindow(scenarioId: string) {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), sandbox: false },
   });
   controllerWindow.loadURL(rendererUrl(`/controller?scenario=${encodeURIComponent(scenarioId)}`));
+  attachControllerKeys(controllerWindow);
   controllerWindow.on('closed', () => {
     controllerWindow = null;
     // コントローラを閉じたら進行画面も終了（対で使うもの）
@@ -323,9 +373,7 @@ function registerIpc() {
   });
 
   /* --- コントローラ ⇄ 進行画面 --- */
-  ipcMain.on('playback:command', (_e, cmd: PlaybackCommand) => {
-    if (playerWindow && !playerWindow.isDestroyed()) playerWindow.webContents.send('playback:command', cmd);
-  });
+  ipcMain.on('playback:command', (_e, cmd: PlaybackCommand) => sendToPlayer(cmd));
   ipcMain.on('playback:state', (_e, state: PlaybackState) => {
     lastPlaybackState = state;
     if (controllerWindow && !controllerWindow.isDestroyed()) controllerWindow.webContents.send('playback:state', state);

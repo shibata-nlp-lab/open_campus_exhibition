@@ -25,40 +25,18 @@ export default function ControllerApp() {
     return api.config.onChanged(setConfig);
   }, []);
 
-  /* コントローラにフォーカスがあるときのキー操作。進行画面と同じ割り当て */
+  /*
+   * キー操作の大半はメインプロセス側（before-input-event）で処理している。
+   * レンダラ内のどこにフォーカスがあっても、IME が有効でも確実に効かせるため。
+   * ここで扱うのは Space だけ（ボタンにフォーカスがあるときの二重発火を避ける必要があるため）。
+   */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key !== ' ') return;
       const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
-      // フォーカス中のボタンの既定動作（Space/Enter でクリック）と二重に効かないように
-      if (t?.tagName === 'BUTTON' && (e.key === ' ' || e.key === 'Enter')) return;
-
-      switch (e.key) {
-        case 'ArrowRight':
-        case ' ':
-        case 'PageDown':
-          e.preventDefault();
-          return api.playback.send({ type: 'advance' });
-        case 'ArrowLeft':
-        case 'PageUp':
-          e.preventDefault();
-          return api.playback.send({ type: 'back' });
-        case 'Escape':
-          return void api.player.close();
-      }
-
-      switch (e.key.toLowerCase()) {
-        case 'n':
-          return api.playback.send({ type: 'next' });
-        case 'p':
-          return api.playback.send({ type: 'prev' });
-        case 's':
-          return api.playback.send({ type: 'standby' });
-        case 'r':
-          return api.playback.send({ type: 'restart' });
-        case 'f':
-          return void api.player.togglePlayerFullscreen();
-      }
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON')) return;
+      e.preventDefault();
+      api.playback.send({ type: 'advance' });
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
