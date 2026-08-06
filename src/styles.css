@@ -53,6 +53,15 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .field > label { font-size: 12px; color: var(--fg-dim); font-weight: 600; letter-spacing: .04em; }
 .field.inline { flex-direction: row; align-items: center; gap: 8px; }
 
+/* ラベル横の ? 。押している間だけ説明を出す */
+.help-btn {
+  margin-left: 6px; width: 15px; height: 15px; padding: 0; vertical-align: -2px;
+  border-radius: 999px; border: 1px solid var(--line); background: var(--bg-2);
+  color: var(--fg-dim); font-size: 10px; line-height: 1; cursor: pointer;
+}
+.help-btn:hover { color: var(--fg); border-color: var(--fg-dim); }
+.help-btn[aria-expanded='true'] { background: var(--fg-dim); color: var(--bg-2); }
+
 .card {
   background: var(--bg-2); border: 1px solid var(--line);
   border-radius: 12px; padding: 16px;

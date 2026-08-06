@@ -66,6 +66,9 @@ const api = {
     prepare: (size: string): Promise<{ ready: boolean }> => unwrap(ipcRenderer.invoke('local:prepare', size)),
     embed: (inputs: string[], size: string): Promise<number[][]> =>
       unwrap(ipcRenderer.invoke('local:embed', { inputs, size })),
+    /** Ruri v3（Sarashina2 由来）のトークナイザで分割する。モデル本体は不要 */
+    tokenize: (text: string, size: string): Promise<Array<{ id: number; text: string }>> =>
+      unwrap(ipcRenderer.invoke('local:tokenize', { text, size })),
   },
   player: {
     open: (scenarioId: string) => ipcRenderer.invoke('player:open', scenarioId),

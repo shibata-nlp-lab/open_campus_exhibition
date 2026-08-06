@@ -17,7 +17,7 @@ import {
   writeCache,
 } from './config';
 import { embed, nextTokenCandidates, verifyKey } from './openai';
-import { embedLocal, isModelReady, prepareModel, RURI_MODELS, type RuriSize } from './localEmbed';
+import { embedLocal, isModelReady, prepareModel, RURI_MODELS, tokenizeRuri, type RuriSize } from './localEmbed';
 import type { ApiResult, AppConfig, ClearResult, DisplayInfo, PlaybackCommand, PlaybackState } from '../src/types';
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
@@ -388,6 +388,9 @@ function registerIpc() {
   ipcMain.handle('local:prepare', (_e, size: RuriSize) => asResult(() => prepareModel(size)));
   ipcMain.handle('local:embed', (_e, args: { inputs: string[]; size: RuriSize }) =>
     asResult(() => embedLocal(args.inputs, args.size))
+  );
+  ipcMain.handle('local:tokenize', (_e, args: { text: string; size: RuriSize }) =>
+    asResult(() => tokenizeRuri(args.text, args.size))
   );
 
   /* --- ウィンドウ / ディスプレイ --- */

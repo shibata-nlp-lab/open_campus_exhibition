@@ -49,6 +49,30 @@ interface Loaded {
 let loaded: Loaded | null = null;
 let loading: Promise<Loaded> | null = null;
 
+/**
+ * トークナイザだけを読む。
+ * tokenizer.json は 7MB 弱なので、埋め込みを使わず分割だけ見せたい場合は
+ * モデル本体（数十〜300MB）を落とさずに済む。
+ */
+const tokenizers = new Map<RuriSize, Promise<any>>();
+
+async function getTokenizer(size: RuriSize): Promise<any> {
+  let p = tokenizers.get(size);
+  if (!p) {
+    p = (async () => {
+      const { AutoTokenizer, env } = await import('@huggingface/transformers');
+      fs.mkdirSync(modelsDir(), { recursive: true });
+      env.cacheDir = modelsDir();
+      return AutoTokenizer.from_pretrained(RURI_MODELS[size].tokenizer);
+    })().catch((e) => {
+      tokenizers.delete(size); // 失敗を握り続けないでやり直せるようにする
+      throw e;
+    });
+    tokenizers.set(size, p);
+  }
+  return p;
+}
+
 async function getPipeline(size: RuriSize): Promise<Loaded> {
   if (loaded?.size === size) return loaded;
   if (loading) {
@@ -56,11 +80,11 @@ async function getPipeline(size: RuriSize): Promise<Loaded> {
     if (l.size === size) return l;
   }
   loading = (async () => {
-    const { AutoTokenizer, AutoModel, env } = await import('@huggingface/transformers');
+    const { AutoModel, env } = await import('@huggingface/transformers');
     fs.mkdirSync(modelsDir(), { recursive: true });
     env.cacheDir = modelsDir();
     const spec = RURI_MODELS[size];
-    const tokenizer = await AutoTokenizer.from_pretrained(spec.tokenizer);
+    const tokenizer = await getTokenizer(size);
     const model = await AutoModel.from_pretrained(spec.onnx, { dtype: 'q8' });
     loaded = { size, tokenizer, model };
     return loaded;
@@ -84,6 +108,47 @@ export function isModelReady(size: RuriSize): boolean {
 export async function prepareModel(size: RuriSize): Promise<{ ready: boolean }> {
   await getPipeline(size);
   return { ready: isModelReady(size) };
+}
+
+const BYTE_TOKEN = /^<0x([0-9A-Fa-f]{2})>$/;
+
+/**
+ * Ruri v3 が実際に使うトークナイザで分割する（進行画面の表示用）。
+ *
+ * SentencePiece Unigram なので `▁` が空白を表す。語彙にない文字は `<0xNN>` の
+ * バイト列に落ちるので、連続するバイトトークンはまとめて文字に戻してから返す
+ * （画面に `<0xE3>` と出しても展示にならないため）。
+ */
+export async function tokenizeRuri(text: string, size: RuriSize): Promise<Array<{ id: number; text: string }>> {
+  const tokenizer = await getTokenizer(size);
+  const pieces: string[] = tokenizer.tokenize(text, { add_special_tokens: false });
+  const ids: number[] = tokenizer.convert_tokens_to_ids(pieces);
+
+  const out: Array<{ id: number; text: string }> = [];
+  for (let i = 0; i < pieces.length; i++) {
+    const m = BYTE_TOKEN.exec(pieces[i]);
+    if (!m) {
+      out.push({ id: ids[i] ?? 0, text: pieces[i].replace(/▁/g, ' ') });
+      continue;
+    }
+    // バイトトークンの連続を1文字ぶんずつ復元する
+    const start = i;
+    const bytes: number[] = [];
+    while (i < pieces.length) {
+      const b = BYTE_TOKEN.exec(pieces[i]);
+      if (!b) break;
+      bytes.push(parseInt(b[1], 16));
+      i++;
+    }
+    i--;
+    const decoded = new TextDecoder().decode(Uint8Array.from(bytes));
+    for (let k = start; k <= i; k++) out.push({ id: ids[k] ?? 0, text: decoded });
+  }
+
+  // 先頭の空白は入力にはなかったものなので落とす
+  if (out.length && out[0].text.trim() === '') out.shift();
+  if (out.length) out[0] = { ...out[0], text: out[0].text.replace(/^ /, '') };
+  return out;
 }
 
 export async function embedLocal(texts: string[], size: RuriSize): Promise<number[][]> {

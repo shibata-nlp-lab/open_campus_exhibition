@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { EmbeddingSource, Interactive1Content, NeighbourSource, RuriSize } from '../types';
+import type { EmbeddingSource, Interactive1Content, NeighbourSource, RuriSize, TokenizerMode } from '../types';
 import type { StepProps } from './PlayerApp';
 import { api, errText } from '../lib/api';
 import { isSubmitEnter } from '../lib/ime';
@@ -53,6 +53,16 @@ function meanVector(vectors: number[][]): number[] {
   const m = new Array<number>(d).fill(0);
   for (const v of vectors) for (let k = 0; k < d; k++) m[k] += v[k] / vectors.length;
   return m;
+}
+
+/** Ruri のトークナイザはメインプロセス側にあるので IPC 越しに呼ぶ */
+async function tokenizeWithRuri(text: string, size: RuriSize): Promise<{ tokens: Tok[]; approximate: boolean } | null> {
+  try {
+    return { tokens: await api.local.tokenize(text, size), approximate: false };
+  } catch (e) {
+    console.warn('ruri tokenize failed', e);
+    return null;
+  }
 }
 
 const poolMemo = new Map<string, Pool>();
@@ -115,6 +125,8 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
   const [phase, setPhase] = useState<Phase>('input');
   const [tokens, setTokens] = useState<Tok[]>([]);
   const [approx, setApprox] = useState(false);
+  /** 実際に分割に使えたトークナイザ（読み込みに失敗すると gpt に落ちる） */
+  const [usedMode, setUsedMode] = useState<TokenizerMode>('gpt');
   const [vectors, setVectors] = useState<number[][] | null>(null);
   const [pool, setPool] = useState<Pool | null>(null);
   const [offline, setOffline] = useState(false);
@@ -123,14 +135,19 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
   const [selected, setSelected] = useState(0);
 
   const mode = content.tokenizerMode ?? 'gpt';
+  const ruriSize = content.ruriSize ?? '130m';
 
   const run = async () => {
     const t = text.trim();
     if (!t) return;
     setBusy(true);
-    // llm-jp は語彙ファイル（約100,000語）の読み込みが入るので少し待つことがある
-    const result = mode === 'llmjp' ? await tokenizeLlmJp(t) : null;
+    // llm-jp は語彙ファイル（約100,000語）の読み込み、Ruri は初回だけトークナイザの
+    // ダウンロード（7MB弱）が入るので少し待つことがある。失敗したら GPT の分割に落とす。
+    let result: { tokens: Tok[]; approximate: boolean } | null = null;
+    if (mode === 'llmjp') result = await tokenizeLlmJp(t);
+    else if (mode === 'ruri') result = await tokenizeWithRuri(t, ruriSize);
     const { tokens: toks, approximate } = result ?? (await tokenize(t));
+    setUsedMode(result ? mode : 'gpt'); // 読み込みに失敗したら o200k_base で分割している
     setBusy(false);
     setTokens(toks.slice(0, 40));
     setApprox(approximate);
@@ -145,7 +162,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
     const spec: EmbedSpec = {
       source: content.embeddingSource ?? 'openai',
       model: config.settings.embeddingModel,
-      ruriSize: content.ruriSize ?? '130m',
+      ruriSize,
     };
     const texts = tokens.map((t) => t.text);
     try {
@@ -260,9 +277,11 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
           <span style={{ fontSize: '.75em' }}>
             {approx
               ? '簡易分割'
-              : mode === 'llmjp'
+              : usedMode === 'llmjp'
                 ? '日本語向けに作られた llm-jp のトークナイザ'
-                : 'GPT-4o と同じ o200k_base'}
+                : usedMode === 'ruri'
+                  ? 'Ruri v3 が実際に使うトークナイザ'
+                  : 'GPT-4o と同じ o200k_base'}
           </span>
         </p>
         <div className="row">
