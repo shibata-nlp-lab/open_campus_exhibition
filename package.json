@@ -11,21 +11,26 @@
     "build": "node scripts/build.mjs",
     "start": "npm run build && electron .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "dist": "npm run build && electron-builder"
+    "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win"
   },
+  "author": "shibata-nlp-lab",
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "js-tiktoken": "^1.0.15",
     "marked": "^12.0.2",
     "pdfjs-dist": "^4.4.168",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "electron": "^43.2.0",
-    "electron-builder": "^24.13.3",
+    "electron-builder": "^26.15.3",
     "esbuild": "^0.23.0",
     "typescript": "^5.5.4",
     "vite": "^5.4.0"
@@ -33,20 +38,66 @@
   "build": {
     "appId": "jp.ac.lab.opencampus.llm",
     "productName": "LLM Exhibit",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "dist/**/*",
       "package.json"
     ],
+    "asarUnpack": [
+      "**/node_modules/onnxruntime-node/**",
+      "**/node_modules/sharp/**",
+      "**/node_modules/@img/**"
+    ],
+    "npmRebuild": false,
+    "afterPack": "scripts/adhoc-sign.mjs",
+    "publish": null,
     "mac": {
       "category": "public.app-category.education",
       "target": [
-        "dmg"
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "files": [
+        "!**/node_modules/onnxruntime-node/bin/napi-v6/win32/**",
+        "!**/node_modules/onnxruntime-node/bin/napi-v6/linux/**"
       ]
+    },
+    "dmg": {
+      "writeUpdateInfo": false
     },
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "files": [
+        "!**/node_modules/onnxruntime-node/bin/napi-v6/darwin/**",
+        "!**/node_modules/onnxruntime-node/bin/napi-v6/linux/**"
       ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   }
 }

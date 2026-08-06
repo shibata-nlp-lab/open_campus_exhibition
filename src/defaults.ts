@@ -33,6 +33,17 @@ export const uid = (prefix = 'id') =>
 
 export const emptyAudio = (): AudioSetting => ({ src: null, volume: 0.6, loop: false });
 
+/** コントローラで来場者の内訳を記録するときの既定の区分 */
+export const DEFAULT_ATTRIBUTE_OPTIONS = [
+  '高校1年',
+  '高校2年',
+  '高校3年',
+  '中学生',
+  '保護者',
+  '先生',
+  'その他',
+];
+
 export const CONTENT_LABELS: Record<ContentType, string> = {
   video: '動画',
   slide: 'スライド',
@@ -91,6 +102,9 @@ export function createContent(type: ContentType): Content {
         placeholder: '例）今日はオープンキャンパスに来ました',
         examples: ['今日はオープンキャンパスに来ました', '大規模言語モデルは言葉を数字に変換する'],
         neighbourSource: 'curated',
+        tokenizerMode: 'gpt',
+        embeddingSource: 'openai',
+        ruriSize: '130m',
       } as Interactive1Content;
     case 'interactive2':
       return {
@@ -146,6 +160,8 @@ export function createContent(type: ContentType): Content {
         message: 'しばらくお待ちください',
         submessage: 'まもなく次の説明がはじまります',
         showClock: true,
+        nextStartMode: 'hidden',
+        nextStartTime: '',
         autoAdvanceSec: 0,
         audio: emptyAudio(),
       } as StandbyContent;
@@ -300,6 +316,7 @@ export function createDefaultConfig(): AppConfig {
       showHints: true,
       preferExternalDisplay: true,
       showController: true,
+      attributeOptions: DEFAULT_ATTRIBUTE_OPTIONS.slice(),
     },
     contents,
     scenarios: [full, short],

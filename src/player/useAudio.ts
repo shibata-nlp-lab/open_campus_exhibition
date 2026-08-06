@@ -3,9 +3,11 @@ import type { AudioSetting } from '../types';
 import { api } from '../lib/api';
 
 /** コンテンツ表示中だけ鳴らす BGM / ナレーション */
-export function useAudio(setting: AudioSetting | undefined) {
+export function useAudio(setting: AudioSetting | undefined, mutedExternal?: boolean) {
   const ref = useRef<HTMLAudioElement | null>(null);
-  const [muted, setMuted] = useState(false);
+  const [mutedLocal, setMuted] = useState(false);
+  // 外部（コントローラ）から制御される場合はそちらを優先する
+  const muted = mutedExternal ?? mutedLocal;
 
   useEffect(() => {
     if (!setting?.src) return;

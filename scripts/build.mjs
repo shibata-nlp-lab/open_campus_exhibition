@@ -12,7 +12,8 @@ export const mainBuildOptions = {
   format: 'cjs',
   target: 'node20',
   outdir: resolve(root, 'dist/main'),
-  external: ['electron'],
+  // ネイティブバイナリを含むので束ねずに node_modules から読ませる
+  external: ['electron', '@huggingface/transformers', 'onnxruntime-node', 'sharp'],
   sourcemap: true,
 };
 

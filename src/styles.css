@@ -288,11 +288,16 @@ table.data th { color: var(--fg-dim); font-weight: 600; font-size: 11px; }
 .standby.overlay { position: absolute; inset: 0; z-index: 40; animation: fade .3s ease both; }
 .standby-msg { font-size: clamp(34px, 5.5vw, 76px); margin: 0; letter-spacing: .04em; }
 .standby-sub { font-size: clamp(16px, 1.8vw, 26px); color: var(--fg-dim); margin: 0; }
-.standby-clock {
-  font-size: clamp(28px, 3.4vw, 48px); color: var(--accent-2);
-  font-variant-numeric: tabular-nums; letter-spacing: .06em;
-}
 .standby-count { font-size: 15px; }
+.standby-times { display: flex; gap: clamp(24px, 5vw, 72px); align-items: flex-start; }
+.standby-time { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.standby-time-label { font-size: clamp(13px, 1.2vw, 17px); color: var(--fg-dim); letter-spacing: .08em; }
+.standby-time-value {
+  font-size: clamp(30px, 3.6vw, 54px); color: var(--accent-2);
+  font-variant-numeric: tabular-nums; letter-spacing: .04em; line-height: 1.1;
+}
+.standby-time.next .standby-time-value { color: var(--warn); }
+.standby-time-sub { font-size: clamp(12px, 1.1vw, 15px); color: var(--fg-dim); }
 .standby-actions { display: flex; gap: 14px; margin-top: 10px; }
 .standby-dots { display: flex; gap: 12px; }
 .standby-dots i {
@@ -307,6 +312,34 @@ table.data th { color: var(--fg-dim); font-weight: 600; font-size: 11px; }
 }
 
 /* ---------------- コントローラ画面 ---------------- */
+
+.standby-panel {
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
+}
+.standby-panel.on { border-color: #5c4526; background: #241d12; }
+.state-dot {
+  width: 11px; height: 11px; border-radius: 50%; background: #33405e; flex: none; display: block;
+}
+.state-dot.on { background: var(--warn); box-shadow: 0 0 0 4px rgba(255,180,84,.18); }
+.state-dot.off { background: #4a3a2a; }
+
+/* 次の回のはじまり（待機画面の表示を進行中に書き換える） */
+.next-start { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
+
+/* 来場者の内訳の手入力 */
+.attr-panel {
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
+}
+.attr-total { font-size: 15px; color: var(--fg-dim); }
+.attr-total strong { font-size: 22px; color: var(--fg); font-variant-numeric: tabular-nums; }
+.attr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+.attr-item {
+  display: flex; align-items: center; gap: 10px; justify-content: space-between;
+  background: var(--bg-3); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px;
+}
+.attr-item.on { border-color: var(--accent); }
+.attr-label { font-size: 14px; }
+.attr-count { min-width: 30px; text-align: center; font-size: 19px; font-variant-numeric: tabular-nums; }
 
 .controller {
   height: 100%; overflow: auto; padding: 18px 22px 22px;

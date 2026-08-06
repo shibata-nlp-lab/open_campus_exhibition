@@ -2,7 +2,7 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { AppConfig, ResultRecord } from '../src/types';
-import { createDefaultConfig, mergeSamples, SAMPLES_VERSION } from '../src/defaults';
+import { createDefaultConfig, DEFAULT_ATTRIBUTE_OPTIONS, mergeSamples, SAMPLES_VERSION } from '../src/defaults';
 
 export const userDir = () => app.getPath('userData');
 export const assetsDir = () => path.join(userDir(), 'assets');
@@ -80,7 +80,16 @@ function migrate(config: AppConfig): AppConfig {
     for (const s of config.scenarios) s.steps = s.steps.filter((st) => !removed.includes(st.contentId));
   }
   for (const c of config.contents) {
-    if (c.type === 'interactive1') c.neighbourSource ??= 'curated';
+    if (c.type === 'interactive1') {
+      c.neighbourSource ??= 'curated';
+      c.tokenizerMode ??= 'gpt';
+      c.embeddingSource ??= 'openai';
+      c.ruriSize ??= '130m';
+    }
+    if (c.type === 'standby') {
+      c.nextStartMode ??= 'hidden';
+      c.nextStartTime ??= '';
+    }
     if (c.type === 'slide') {
       c.markdownSource ??= 'inline';
       c.externalPath ??= null;
@@ -100,6 +109,9 @@ function migrate(config: AppConfig): AppConfig {
   }
   config.settings.preferExternalDisplay ??= true;
   config.settings.showController ??= true;
+  if (!Array.isArray(config.settings.attributeOptions) || config.settings.attributeOptions.length === 0) {
+    config.settings.attributeOptions = DEFAULT_ATTRIBUTE_OPTIONS.slice();
+  }
 
   // 同梱サンプルが更新されていたら取り込む
   if ((config.samplesVersion ?? 0) < SAMPLES_VERSION) {
@@ -169,6 +181,25 @@ export function assetAbsolutePath(rel: string): string {
 
 export function appendResult(record: ResultRecord) {
   fs.appendFileSync(resultsPath(), JSON.stringify(record) + '\n', 'utf-8');
+}
+
+/**
+ * 集計ログを空にする。消す前に必ず results-YYYYMMDD-HHMM.jsonl として同じ場所に退避するので、
+ * 誤操作しても手で戻せる（フェイルセーフ）。
+ */
+export function clearResults(): { cleared: number; backup: string | null } {
+  const rows = readResults();
+  if (rows.length === 0) {
+    fs.rmSync(resultsPath(), { force: true });
+    return { cleared: 0, backup: null };
+  }
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  const backup = path.join(userDir(), `results-${stamp}.jsonl`);
+  fs.copyFileSync(resultsPath(), backup);
+  fs.writeFileSync(resultsPath(), '', 'utf-8');
+  return { cleared: rows.length, backup };
 }
 
 export function readResults(): ResultRecord[] {

@@ -1,0 +1,31 @@
+name: CI
+
+# main への push と Pull Request で、型と本体ビルドが通ることだけを確認する軽い検査。
+# 配布ファイル（dmg / exe）の作成は release.yml が担当する。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      # ここでは Electron を起動しないので、100MB 超のバイナリは落とさない
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 依存をインストール
+        run: npm ci
+
+      - name: 型チェック
+        run: npm run typecheck
+
+      - name: ビルド（main / preload / renderer）
+        run: npm run build

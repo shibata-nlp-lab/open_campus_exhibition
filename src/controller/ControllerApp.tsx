@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import type { AppConfig, DisplayInfo, PlaybackState } from '../types';
 import { CONTENT_LABELS } from '../defaults';
 import { api } from '../lib/api';
+import AttributePanel from './AttributePanel';
+import NextStartPanel from './NextStartPanel';
 
 /** 本体画面に出す進行コントローラ。進行画面（外部モニター）を手元から操作する */
 export default function ControllerApp() {
@@ -42,6 +44,27 @@ export default function ControllerApp() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  /*
+   * 時刻や属性を打ち込んでいる間は、メインプロセス側のショートカット横取りを止める。
+   * （そうしないと "n" や "s" がそのまま進行操作になってしまう）
+   */
+  useEffect(() => {
+    const isField = (el: EventTarget | null) => {
+      const t = el as HTMLElement | null;
+      if (!t) return false;
+      return t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable;
+    };
+    const onIn = (e: FocusEvent) => api.controller.setTyping(isField(e.target));
+    const onOut = () => api.controller.setTyping(false);
+    window.addEventListener('focusin', onIn);
+    window.addEventListener('focusout', onOut);
+    return () => {
+      window.removeEventListener('focusin', onIn);
+      window.removeEventListener('focusout', onOut);
+      api.controller.setTyping(false);
+    };
+  }, []);
+
   // 経過時間（コンテンツが変わるとリセット）
   useEffect(() => {
     setElapsed(0);
@@ -63,6 +86,7 @@ export default function ControllerApp() {
   }
 
   const current = state.steps[state.index];
+  const bgmOn = Boolean(state.standbyAudio?.available) && !state.standbyAudio?.muted;
   const upcoming = state.steps[state.index + 1];
 
   return (
@@ -108,13 +132,43 @@ export default function ControllerApp() {
         </button>
       </div>
 
-      <button
-        className={`btn lg ${state.standby ? 'primary' : ''}`}
-        style={{ padding: '16px 0' }}
-        onClick={() => api.playback.send({ type: 'standby', on: !state.standby })}
-      >
-        {state.standby ? '⏸ 待機画面を解除して再開' : '⏸ 待機画面を表示（お待ちください）'}
-      </button>
+      <section className={`standby-panel ${state.standby ? 'on' : ''}`}>
+        <div className="row" style={{ marginBottom: 10 }}>
+          <span className={`state-dot ${state.standby ? 'on' : ''}`} />
+          <strong>{state.standby ? '待機画面を表示中' : '待機画面は出ていません'}</strong>
+        </div>
+        <button
+          className={`btn lg ${state.standby ? '' : 'primary'}`}
+          style={{ width: '100%', padding: '16px 0' }}
+          onClick={() => api.playback.send({ type: 'standby', on: !state.standby })}
+        >
+          {state.standby ? '待機画面を解除して再開 ▶' : '⏸ 待機画面を表示する'}
+        </button>
+
+        <div className="row" style={{ marginTop: 12 }}>
+          <span className={`state-dot ${bgmOn ? 'on' : 'off'}`} />
+          <span>
+            BGM：<strong>{!state.standbyAudio?.available ? '音源なし' : bgmOn ? '再生中' : 'ミュート中'}</strong>
+          </span>
+          <div className="spacer" />
+          <button
+            className={`btn ${bgmOn ? '' : 'primary'}`}
+            disabled={!state.standbyAudio?.available}
+            onClick={() => api.playback.send({ type: 'standbyMute', muted: bgmOn })}
+          >
+            {bgmOn ? '🔇 BGMを止める' : '🔊 BGMを鳴らす'}
+          </button>
+        </div>
+        {!state.standbyAudio?.available && (
+          <div className="small muted" style={{ marginTop: 6 }}>
+            待機画面のコンテンツに音声ファイルを設定すると操作できます。
+          </div>
+        )}
+
+        <NextStartPanel config={config} state={state} />
+      </section>
+
+      <AttributePanel config={config} state={state} />
 
       <section>
         <div className="ctrl-label">シナリオ（クリックで移動）</div>

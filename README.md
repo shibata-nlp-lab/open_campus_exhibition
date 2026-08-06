@@ -21,11 +21,67 @@ npm run dev
 npm start
 ```
 
-配布用パッケージ（dmg / nsis）:
+配布用パッケージ:
 
 ```bash
-npm run dist
+npm run dist:mac
 ```
+
+詳細は「[配布ファイルの作り方](#配布ファイルの作り方)」を参照。
+
+## 配布ファイルの作り方
+
+electron-builder で作ります。成果物は `release/` に出ます。
+
+| コマンド | 作られるもの |
+| --- | --- |
+| `npm run dist:mac` | `LLM Exhibit-<版>-mac-arm64.dmg` / `.zip`（Apple Silicon 用） |
+| `npm run dist:win` | `LLM Exhibit-<版>-win-x64.exe`（NSIS インストーラ。Windows 上で実行） |
+
+macOS 版は Windows 上では、Windows 版は macOS 上では作れません（ネイティブモジュールと署名のため）。
+両方まとめて作りたいときは、後述の GitHub Actions に任せるのが確実です。
+
+手元でビルドするときの注意:
+
+- **iCloud Drive 同期下（`~/Documents` など）では失敗します。** `node_modules` の読み出しが同期待ちになり、
+  `ETIMEDOUT: connection timed out, read` で落ちます。同期外（例 `~/dev/open_campus`）で実行してください
+- **arm64 の Node を使ってください。** Rosetta の x64 Node で `npm ci` すると sharp の x64 版が入り、
+  arm64 アプリに x64 バイナリが同梱されます（WASM 版へのフォールバックで動きはしますが遅くなります）。
+  `node -p process.arch` が `x64` を返す場合は arm64 版の Node に入れ替えるか、GitHub Actions でビルドしてください
+- できあがるアプリは 600MB 前後（dmg で 210MB 前後）です。onnxruntime の共有ライブラリと Electron 本体が大半を占めます
+
+### GitHub Actions（CI）
+
+| ワークフロー | いつ動くか | すること |
+| --- | --- | --- |
+| `.github/workflows/ci.yml` | main への push / Pull Request | 型チェックとビルドが通るかだけ確認（1〜2分） |
+| `.github/workflows/release.yml` | `v` で始まるタグの push、または手動実行 | macOS(arm64) と Windows(x64) を並列ビルドし、タグのときは GitHub Release に添付 |
+
+リリース手順:
+
+```bash
+npm version patch   # package.json の版を上げてタグを打つ
+git push --follow-tags
+```
+
+10〜15分ほどで Releases に dmg / zip / exe が並びます。
+版を上げずに動作だけ試したいときは、GitHub の Actions タブから Release ワークフローを手動実行すると、
+Release は作らずに成果物（Artifacts）だけが残ります。
+
+### 受け取った人がやること（macOS）
+
+Apple Developer ID を持っていないため、配布物には**アドホック署名しか付いていません**（`scripts/adhoc-sign.mjs`）。
+そのため初回起動時に「開発元を確認できないため開けません」と出ます。次のどちらかで開きます。
+
+- アプリを **右クリック →「開く」**（初回だけ。2回目以降は普通に起動できる）
+- それでも駄目なら、ターミナルで検疫属性を外す:
+
+```bash
+xattr -cr "/Applications/LLM Exhibit.app"
+```
+
+Developer ID を用意できる場合は、証明書(.p12)とパスワードを GitHub Secrets（`CSC_LINK` / `CSC_KEY_PASSWORD`）に登録し、
+`release.yml` の `CSC_IDENTITY_AUTO_DISCOVERY: 'false'` を外せば、そのまま署名付きビルドになります。
 
 ## macOS で「マルウェアがブロックされました」と出るとき
 
