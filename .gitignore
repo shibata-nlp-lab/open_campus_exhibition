@@ -24,3 +24,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# ユーザーが用意するコンテンツ（音源・動画・スライドなど）。フォルダだけ残す
+contents/*
+!contents/.gitkeep
