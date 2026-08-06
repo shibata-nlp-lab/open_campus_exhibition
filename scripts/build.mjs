@@ -1,6 +1,6 @@
 import { build as viteBuild } from 'vite';
 import * as esbuild from 'esbuild';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -23,4 +23,6 @@ async function run() {
   console.log('build done');
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) run();
+// 直接実行されたときだけビルドする（dev.mjs からは import して使う）。
+// Windows のパスは `file:///D:/...` になるため、文字列連結で比較すると一致せず素通りしてしまう。
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) run();
