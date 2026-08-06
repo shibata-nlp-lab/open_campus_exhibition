@@ -73,5 +73,6 @@ jobs:
           set -eu
           gh release view "$TAG" >/dev/null 2>&1 || \
             gh release create "$TAG" --title "$TAG" --generate-notes
-          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' \) \
-            -exec gh release upload "$TAG" {} --clobber +
+          mapfile -t files < <(find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' \))
+          printf '添付するファイル:\n%s\n' "${files[@]}"
+          gh release upload "$TAG" --clobber "${files[@]}"
