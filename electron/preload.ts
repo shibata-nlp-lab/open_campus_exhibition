@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type {
   ApiResult,
   AppConfig,
+  ClearResult,
   DisplayInfo,
   PlaybackCommand,
   PlaybackState,
@@ -59,6 +60,13 @@ const api = {
     embed: (inputs: string[], model: string, dimensions?: number): Promise<number[][]> =>
       unwrap(ipcRenderer.invoke('openai:embed', { inputs, model, dimensions })),
   },
+  local: {
+    models: (): Promise<Array<{ size: string; label: string; mb: number; ready: boolean }>> =>
+      ipcRenderer.invoke('local:models'),
+    prepare: (size: string): Promise<{ ready: boolean }> => unwrap(ipcRenderer.invoke('local:prepare', size)),
+    embed: (inputs: string[], size: string): Promise<number[][]> =>
+      unwrap(ipcRenderer.invoke('local:embed', { inputs, size })),
+  },
   player: {
     open: (scenarioId: string) => ipcRenderer.invoke('player:open', scenarioId),
     close: () => ipcRenderer.invoke('player:close'),
@@ -99,10 +107,25 @@ const api = {
     },
     current: (): Promise<PlaybackState | null> => ipcRenderer.invoke('playback:current'),
   },
+  controller: {
+    /** 入力欄にフォーカスがある間は main 側のショートカット横取りを止める */
+    setTyping: (on: boolean) => ipcRenderer.send('controller:typing', on),
+    /** コントローラ画面が開いているか（進行画面が操作ボタンを出すかの判断に使う） */
+    exists: (): Promise<boolean> => ipcRenderer.invoke('controller:exists'),
+    onPresence: (cb: (has: boolean) => void) => {
+      const handler = (_e: unknown, has: boolean) => cb(has);
+      ipcRenderer.on('controller:presence', handler);
+      return () => {
+        ipcRenderer.off('controller:presence', handler);
+      };
+    },
+  },
   results: {
     append: (record: ResultRecord) => ipcRenderer.invoke('result:append', record),
     list: (): Promise<ResultRecord[]> => ipcRenderer.invoke('result:list'),
     exportCsv: (): Promise<string | null> => ipcRenderer.invoke('result:exportCsv'),
+    /** 確認ダイアログ＋バックアップ付きで全消去 */
+    clear: (): Promise<ClearResult> => ipcRenderer.invoke('result:clear'),
   },
 };
 

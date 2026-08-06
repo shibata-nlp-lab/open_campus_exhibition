@@ -6,6 +6,7 @@ import {
   appendResult,
   assetAbsolutePath,
   assetsDir,
+  clearResults,
   ensureDirs,
   importAsset,
   loadConfig,
@@ -16,7 +17,8 @@ import {
   writeCache,
 } from './config';
 import { embed, nextTokenCandidates, verifyKey } from './openai';
-import type { ApiResult, AppConfig, DisplayInfo, PlaybackCommand, PlaybackState } from '../src/types';
+import { embedLocal, isModelReady, prepareModel, RURI_MODELS, type RuriSize } from './localEmbed';
+import type { ApiResult, AppConfig, ClearResult, DisplayInfo, PlaybackCommand, PlaybackState } from '../src/types';
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 
@@ -27,6 +29,8 @@ let controllerWindow: BrowserWindow | null = null;
 let playerDisplayId: number | null = null;
 /** コントローラが後から開いても現在値を出せるように保持 */
 let lastPlaybackState: PlaybackState | null = null;
+/** コントローラで入力欄にフォーカスがある間はショートカットを止める（時刻や属性の打ち込み用） */
+let controllerTyping = false;
 
 /* ---------------- API キー（safeStorage で暗号化して別ファイル保存） ---------------- */
 
@@ -100,6 +104,12 @@ function pickPlayerDisplay(preferExternal: boolean) {
   return external ? { target: external, external: true } : { target: primary, external: false };
 }
 
+/** コントローラの有無を進行画面に伝える（手元で操作できるなら画面上のボタンは出さない） */
+function notifyControllerPresence() {
+  const has = Boolean(controllerWindow && !controllerWindow.isDestroyed());
+  if (playerWindow && !playerWindow.isDestroyed()) playerWindow.webContents.send('controller:presence', has);
+}
+
 /** コントローラの操作を進行画面へ送る */
 function sendToPlayer(cmd: PlaybackCommand) {
   if (playerWindow && !playerWindow.isDestroyed()) playerWindow.webContents.send('playback:command', cmd);
@@ -114,6 +124,8 @@ function sendToPlayer(cmd: PlaybackCommand) {
 function attachControllerKeys(win: BrowserWindow) {
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown' || input.meta || input.control || input.alt) return;
+    // 入力欄に打ち込んでいる間は Esc も含めて一切横取りしない（誤終了を防ぐ）
+    if (controllerTyping) return;
 
     const handled = (fn: () => void) => {
       event.preventDefault();
@@ -168,8 +180,11 @@ function createControllerWindow(scenarioId: string) {
   });
   controllerWindow.loadURL(rendererUrl(`/controller?scenario=${encodeURIComponent(scenarioId)}`));
   attachControllerKeys(controllerWindow);
+  notifyControllerPresence();
   controllerWindow.on('closed', () => {
     controllerWindow = null;
+    controllerTyping = false;
+    notifyControllerPresence();
     // コントローラを閉じたら進行画面も終了（対で使うもの）
     if (playerWindow && !playerWindow.isDestroyed()) playerWindow.close();
   });
@@ -361,6 +376,20 @@ function registerIpc() {
     })
   );
 
+  /* --- ローカル埋め込み（Ruri v3） --- */
+  ipcMain.handle('local:models', () =>
+    Object.entries(RURI_MODELS).map(([size, m]) => ({
+      size,
+      label: m.label,
+      mb: m.mb,
+      ready: isModelReady(size as RuriSize),
+    }))
+  );
+  ipcMain.handle('local:prepare', (_e, size: RuriSize) => asResult(() => prepareModel(size)));
+  ipcMain.handle('local:embed', (_e, args: { inputs: string[]; size: RuriSize }) =>
+    asResult(() => embedLocal(args.inputs, args.size))
+  );
+
   /* --- ウィンドウ / ディスプレイ --- */
   ipcMain.handle('player:open', (_e, scenarioId: string) => createPlayerWindow(scenarioId));
   ipcMain.handle('player:close', () => {
@@ -388,6 +417,8 @@ function registerIpc() {
     if (controllerWindow && !controllerWindow.isDestroyed()) controllerWindow.webContents.send('playback:state', state);
   });
   ipcMain.handle('playback:current', () => lastPlaybackState);
+  ipcMain.on('controller:typing', (_e, on: boolean) => (controllerTyping = Boolean(on)));
+  ipcMain.handle('controller:exists', () => Boolean(controllerWindow && !controllerWindow.isDestroyed()));
 
   /* --- 集計 --- */
   ipcMain.handle('result:append', (_e, record) => {
@@ -395,6 +426,30 @@ function registerIpc() {
     return true;
   });
   ipcMain.handle('result:list', () => readResults());
+  /**
+   * 集計のリセット。
+   * フェイルセーフとして (1) 件数を出した OS のモーダルで確認し、
+   * (2) 既定ボタンを「キャンセル」にし、(3) 消す前に必ずバックアップを取る。
+   */
+  ipcMain.handle('result:clear', async (e): Promise<ClearResult> => {
+    const rows = readResults();
+    const owner = BrowserWindow.fromWebContents(e.sender);
+    const opts: Electron.MessageBoxOptions = {
+      type: 'warning',
+      title: '集計結果のリセット',
+      message: `記録されている ${rows.length} 件をすべて消去しますか？`,
+      detail:
+        '消す直前に results-日時.jsonl という名前でバックアップを保存するので、あとから戻すことはできます。\nCSV書き出しがまだなら、先に書き出しておくことをおすすめします。',
+      buttons: ['キャンセル', 'リセットする'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    };
+    const res = owner ? await dialog.showMessageBox(owner, opts) : await dialog.showMessageBox(opts);
+    if (res.response !== 1) return { canceled: true, cleared: 0, backup: null };
+    const done = clearResults();
+    return { canceled: false, ...done };
+  });
   ipcMain.handle('result:exportCsv', async () => {
     const rows = readResults();
     const res = await dialog.showSaveDialog({ defaultPath: 'results.csv', filters: [{ name: 'CSV', extensions: ['csv'] }] });

@@ -87,9 +87,27 @@ export interface QuizContent extends ContentBase {
 /**
  * 「意味が近いことば」を探す候補プール。
  * - curated:   同梱の厳選語彙（約120語）。結果が読みやすい
- * - tokenizer: o200k_base の日本語形トークン（約3,800語）。実物どおりだが中国語・断片・スパム語も混ざる
+ * - tokenizer: o200k_base から抽出した日本語（約1,840語）。GPT系の実物だが中国語や5ch定型も混ざる
+ * - llmjp:     llm-jp の語彙から抽出した日本語（約数万語）。日本語モデルの語彙
  */
-export type NeighbourSource = 'curated' | 'tokenizer';
+export type NeighbourSource = 'curated' | 'tokenizer' | 'llmjp';
+
+/**
+ * 入力文をどのトークナイザで分割するか。
+ * - gpt:   o200k_base（GPT-4o の実物。日本語はほぼ1文字ずつに切れる）
+ * - llmjp: llm-jp の SentencePiece Unigram（日本語向けなので単語単位で切れる）
+ */
+export type TokenizerMode = 'gpt' | 'llmjp';
+
+/**
+ * ベクトル化（埋め込み）の取得元。
+ * - openai: OpenAI Embeddings API（多言語・要APIキー）
+ * - ruri:   ローカルの日本語モデル Ruri v3（初回だけモデルをダウンロード。以降はオフラインで高速）
+ */
+export type EmbeddingSource = 'openai' | 'ruri';
+
+/** Ruri v3 のモデルサイズ */
+export type RuriSize = '30m' | '130m' | '310m';
 
 export interface Interactive1Content extends ContentBase {
   type: 'interactive1';
@@ -97,6 +115,9 @@ export interface Interactive1Content extends ContentBase {
   placeholder: string;
   examples: string[];
   neighbourSource: NeighbourSource;
+  tokenizerMode: TokenizerMode;
+  embeddingSource: EmbeddingSource;
+  ruriSize: RuriSize;
 }
 
 export interface Interactive2Content extends ContentBase {
@@ -153,6 +174,9 @@ export interface SurveyContent extends ContentBase {
   audio: AudioSetting;
 }
 
+/** 次の回の開始時刻の見せ方 */
+export type NextStartMode = 'hidden' | 'undecided' | 'time';
+
 /** 説明の合間に出す「お待ちください」画面 */
 export interface StandbyContent extends ContentBase {
   type: 'standby';
@@ -160,6 +184,10 @@ export interface StandbyContent extends ContentBase {
   submessage: string;
   /** 現在時刻を表示する */
   showClock: boolean;
+  /** 次の回の開始時刻の扱い */
+  nextStartMode: NextStartMode;
+  /** nextStartMode==='time' のときの時刻（HH:MM） */
+  nextStartTime: string;
   /** 0 より大きいとカウントダウンし、0 で自動的に次へ進む（秒） */
   autoAdvanceSec: number;
   audio: AudioSetting;
@@ -203,6 +231,8 @@ export interface AppSettings {
   preferExternalDisplay: boolean;
   /** 進行画面を外部モニターに出したとき、本体画面にコントローラを表示する */
   showController: boolean;
+  /** コントローラで来場者の属性を記録するときの区分 */
+  attributeOptions: string[];
 }
 
 export interface AppConfig {
@@ -221,8 +251,25 @@ export interface ResultRecord {
   ts: string;
   scenarioId: string | null;
   contentId: string;
-  kind: 'quiz' | 'survey' | 'game';
+  kind: 'quiz' | 'survey' | 'game' | 'attribute';
   payload: unknown;
+}
+
+/** kind==='attribute' の payload。コントローラから手入力する来場者の内訳 */
+export interface AttributePayload {
+  /** 区分ごとの人数 */
+  counts: Record<string, number>;
+  /** 合計人数 */
+  people: number;
+  memo: string;
+}
+
+/** 集計のリセット結果。canceled のときは何もしていない */
+export interface ClearResult {
+  canceled: boolean;
+  cleared: number;
+  /** 退避先の絶対パス（0 件のときは null） */
+  backup: string | null;
 }
 
 /* ---------- IPC ---------- */
@@ -258,6 +305,10 @@ export interface PlaybackState {
   detail: string | null;
   /** 待機画面を重ねて表示しているか */
   standby: boolean;
+  /** 待機画面のBGMの状態（コントローラから操作するため） */
+  standbyAudio: { available: boolean; muted: boolean };
+  /** いま効いている待機画面の「次の回のはじまり」（コントローラから編集するため） */
+  standbyNext: { contentId: string; mode: NextStartMode; time: string };
 }
 
 export type PlaybackCommand =
@@ -269,4 +320,6 @@ export type PlaybackCommand =
   | { type: 'goto'; index: number }
   | { type: 'restart' }
   /** 待機画面のオン/オフ（省略時はトグル） */
-  | { type: 'standby'; on?: boolean };
+  | { type: 'standby'; on?: boolean }
+  /** 待機画面のBGMのミュート切替（省略時はトグル） */
+  | { type: 'standbyMute'; muted?: boolean };

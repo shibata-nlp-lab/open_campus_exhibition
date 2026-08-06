@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import type { DisplayInfo } from '../types';
 import { api } from '../lib/api';
-import { mergeSamples } from '../defaults';
+import { DEFAULT_ATTRIBUTE_OPTIONS, mergeSamples } from '../defaults';
 import { Field, Toggle, type PanelProps } from './common';
 
 export default function GeneralPanel({ config, update }: PanelProps) {
   const [displays, setDisplays] = useState<DisplayInfo[]>([]);
+  const [attrText, setAttrText] = useState(
+    (config.settings.attributeOptions ?? DEFAULT_ATTRIBUTE_OPTIONS).join('\n')
+  );
   useEffect(() => {
     api.display.list().then(setDisplays);
     return api.display.onChanged(setDisplays);
@@ -70,6 +73,26 @@ export default function GeneralPanel({ config, update }: PanelProps) {
             モニターが1台のみのため、進行画面は本体画面に全画面表示され、コントローラは開きません。
           </div>
         )}
+      </div>
+
+      <div className="card" style={{ maxWidth: 620, marginTop: 16 }}>
+        <div className="small muted" style={{ marginBottom: 10 }}>来場者の属性（コントローラで記録する区分）</div>
+        <p className="small muted" style={{ marginTop: 0 }}>
+          進行中にコントローラ画面から、来場グループの内訳を人数つきで記録できます。ここでその区分を決めます（1行に1つ）。
+        </p>
+        {/* 入力中は改行をそのまま保つため、確定（フォーカスが外れたとき）に配列へ直す */}
+        <textarea
+          className="input"
+          rows={7}
+          value={attrText}
+          onChange={(e) => setAttrText(e.target.value)}
+          onBlur={() => {
+            const list = attrText.split('\n').map((v) => v.trim()).filter(Boolean);
+            const next = list.length > 0 ? list : DEFAULT_ATTRIBUTE_OPTIONS.slice();
+            setAttrText(next.join('\n'));
+            patch((x) => void (x.attributeOptions = next));
+          }}
+        />
       </div>
 
       <div className="card" style={{ maxWidth: 620, marginTop: 16 }}>

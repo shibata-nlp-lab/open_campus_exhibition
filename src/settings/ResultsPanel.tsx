@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ResultRecord } from '../types';
+import type { AttributePayload, ResultRecord } from '../types';
 import { api } from '../lib/api';
 
 export default function ResultsPanel() {
   const [rows, setRows] = useState<ResultRecord[]>([]);
   const [kind, setKind] = useState<'all' | ResultRecord['kind']>('all');
+  const [cleared, setCleared] = useState<{ count: number; backup: string | null } | null>(null);
 
   const load = () => api.results.list().then(setRows);
   useEffect(() => {
@@ -28,10 +29,32 @@ export default function ResultsPanel() {
     return map;
   }, [rows]);
 
+  /** コントローラで記録した来場者の内訳 */
+  const attrTally = useMemo(() => {
+    const map = new Map<string, number>();
+    let people = 0;
+    let groups = 0;
+    for (const r of rows) {
+      if (r.kind !== 'attribute') continue;
+      const p = r.payload as AttributePayload;
+      groups += 1;
+      people += p.people ?? 0;
+      for (const [label, n] of Object.entries(p.counts ?? {})) map.set(label, (map.get(label) ?? 0) + n);
+    }
+    return { map, people, groups };
+  }, [rows]);
+
+  const reset = async () => {
+    const res = await api.results.clear();
+    if (res.canceled) return;
+    setCleared({ count: res.cleared, backup: res.backup });
+    load();
+  };
+
   return (
     <>
       <h2>集計結果</h2>
-      <p className="lead">進行画面で記録されたクイズ・ゲーム・アンケート・証明書発行のログです。</p>
+      <p className="lead">進行画面で記録されたクイズ・ゲーム・アンケートと、コントローラで記録した来場者の内訳です。</p>
 
       <div className="row" style={{ marginBottom: 14 }}>
         <select className="select" style={{ width: 200 }} value={kind} onChange={(e) => setKind(e.target.value as typeof kind)}>
@@ -39,12 +62,62 @@ export default function ResultsPanel() {
           <option value="quiz">クイズ</option>
           <option value="game">ゲーム</option>
           <option value="survey">アンケート</option>
+          <option value="attribute">来場者の内訳</option>
         </select>
         <button className="btn sm" onClick={load}>更新</button>
         <button className="btn sm" onClick={() => api.results.exportCsv()}>CSV書き出し</button>
         <div className="spacer" />
         <span className="small muted">{rows.length} 件</span>
+        <button className="btn sm danger" onClick={reset} disabled={rows.length === 0}>
+          集計をリセット
+        </button>
       </div>
+
+      {cleared && (
+        <div className="card" style={{ marginBottom: 18, borderColor: 'var(--ok)' }}>
+          <div>✓ {cleared.count} 件をリセットしました。</div>
+          {cleared.backup && (
+            <div className="row small muted" style={{ marginTop: 8 }}>
+              <span>消す前のデータは次の場所に残しています：</span>
+              <button className="btn sm" onClick={() => api.file.reveal(cleared.backup!)}>
+                バックアップの場所を開く
+              </button>
+            </div>
+          )}
+          <div className="row" style={{ marginTop: 8 }}>
+            <div className="spacer" />
+            <button className="btn sm" onClick={() => setCleared(null)}>閉じる</button>
+          </div>
+        </div>
+      )}
+
+      {attrTally.groups > 0 && (
+        <div className="card" style={{ marginBottom: 18 }}>
+          <div className="row small muted" style={{ marginBottom: 10 }}>
+            <span>来場者の内訳</span>
+            <div className="spacer" />
+            <span>
+              {attrTally.groups} グループ / のべ {attrTally.people} 人
+            </span>
+          </div>
+          {[...attrTally.map.entries()].sort((a, b) => b[1] - a[1]).map(([label, n]) => (
+            <div key={label} className="row small" style={{ marginBottom: 3 }}>
+              <div style={{ width: 220 }}>{label}</div>
+              <div style={{ flex: 1, background: '#16203a', borderRadius: 4, height: 10 }}>
+                <div
+                  style={{
+                    width: `${(n / Math.max(1, attrTally.people)) * 100}%`,
+                    height: '100%',
+                    background: 'var(--accent-2)',
+                    borderRadius: 4,
+                  }}
+                />
+              </div>
+              <div style={{ width: 60, textAlign: 'right' }}>{n} 人</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {surveyTally.size > 0 && (
         <div className="card" style={{ marginBottom: 18 }}>

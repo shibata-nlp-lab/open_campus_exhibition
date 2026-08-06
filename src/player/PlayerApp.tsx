@@ -29,10 +29,18 @@ export default function PlayerApp({ scenarioId }: { scenarioId: string | null })
   const [runKey, setRunKey] = useState(0);
   const [detail, setDetail] = useState<string | null>(null);
   const [standby, setStandby] = useState(false);
+  const [standbyMuted, setStandbyMuted] = useState(false);
+  /** コントローラ画面が開いているか。開いていれば来場者側に操作ボタンは出さない */
+  const [hasController, setHasController] = useState(false);
 
   useEffect(() => {
     api.config.load().then(setConfig);
     return api.config.onChanged(setConfig);
+  }, []);
+
+  useEffect(() => {
+    api.controller.exists().then(setHasController);
+    return api.controller.onPresence(setHasController);
   }, []);
 
   const scenario = useMemo(() => {
@@ -101,6 +109,7 @@ export default function PlayerApp({ scenarioId }: { scenarioId: string | null })
       else if (cmd.type === 'goto') goto(cmd.index);
       else if (cmd.type === 'restart') restart();
       else if (cmd.type === 'standby') setStandby((v) => cmd.on ?? !v);
+      else if (cmd.type === 'standbyMute') setStandbyMuted((v) => cmd.muted ?? !v);
       else if (cmd.type === 'advance' || cmd.type === 'back') {
         // 表示中のコンテンツ側のキー処理（useStepKeys）にそのまま流す
         window.dispatchEvent(
@@ -109,6 +118,38 @@ export default function PlayerApp({ scenarioId }: { scenarioId: string | null })
       }
     });
   }, [next, prev, goto, restart]);
+
+  /**
+   * オーバーレイ用の待機画面。
+   * シナリオ内に待機コンテンツがあればその設定（BGM含む）を流用し、なければ既定の文言を使う。
+   */
+  const overlayStandby: StandbyContent = useMemo(
+    () =>
+      (config?.contents.find((c) => c.type === 'standby') as StandbyContent | undefined) ?? {
+        id: 'standby_default',
+        type: 'standby',
+        name: '待機画面',
+        message: 'しばらくお待ちください',
+        submessage: 'まもなく再開します',
+        showClock: true,
+        nextStartMode: 'hidden',
+        nextStartTime: '',
+        autoAdvanceSec: 0,
+        audio: { src: null, volume: 0.6, loop: true },
+      },
+    [config]
+  );
+
+  /** いま待機画面のBGMを操作できる状態か */
+  const currentContent = steps[index];
+  const standbyAudioAvailable =
+    currentContent?.type === 'standby'
+      ? Boolean((currentContent as StandbyContent).audio?.src)
+      : standby && Boolean(overlayStandby.audio?.src);
+
+  /** コントローラで開始時刻を編集する対象（表示中の待機画面 → なければオーバーレイ用） */
+  const effectiveStandby =
+    currentContent?.type === 'standby' ? (currentContent as StandbyContent) : overlayStandby;
 
   /* コントローラへ状態を配信 */
   const publishedRef = useRef('');
@@ -122,12 +163,18 @@ export default function PlayerApp({ scenarioId }: { scenarioId: string | null })
       steps: steps.map((c) => ({ id: c.id, name: c.name, type: c.type, note: c.note })),
       detail,
       standby,
+      standbyAudio: { available: standbyAudioAvailable, muted: standbyMuted },
+      standbyNext: {
+        contentId: effectiveStandby.id,
+        mode: effectiveStandby.nextStartMode ?? 'hidden',
+        time: effectiveStandby.nextStartTime ?? '',
+      },
     };
     const json = JSON.stringify(state);
     if (json === publishedRef.current) return;
     publishedRef.current = json;
     api.playback.publish(state);
-  }, [scenario, index, steps, detail, standby]);
+  }, [scenario, index, steps, detail, standby, standbyAudioAvailable, standbyMuted, effectiveStandby]);
 
   if (!config) return <div className="player" />;
 
@@ -163,22 +210,6 @@ export default function PlayerApp({ scenarioId }: { scenarioId: string | null })
     runKey,
   };
 
-  /**
-   * オーバーレイ用の待機画面。
-   * シナリオ内に待機コンテンツがあればその設定（BGM含む）を流用し、なければ既定の文言を使う。
-   */
-  const overlayStandby: StandbyContent =
-    (config.contents.find((c) => c.type === 'standby') as StandbyContent | undefined) ?? {
-      id: 'standby_default',
-      type: 'standby',
-      name: '待機画面',
-      message: 'しばらくお待ちください',
-      submessage: 'まもなく再開します',
-      showClock: true,
-      autoAdvanceSec: 0,
-      audio: { src: null, volume: 0.6, loop: true },
-    };
-
   const body = (() => {
     switch (content.type) {
       case 'video': return <VideoStep {...(stepProps as StepProps<typeof content>)} />;
@@ -188,7 +219,8 @@ export default function PlayerApp({ scenarioId }: { scenarioId: string | null })
       case 'interactive2': return <Interactive2Step {...(stepProps as StepProps<typeof content>)} />;
       case 'game': return <GameStep {...(stepProps as StepProps<typeof content>)} />;
       case 'survey': return <SurveyStep {...(stepProps as StepProps<typeof content>)} />;
-      case 'standby': return <StandbyStep {...(stepProps as StepProps<typeof content>)} />;
+      case 'standby':
+        return <StandbyStep {...(stepProps as StepProps<typeof content>)} standbyMuted={standbyMuted} />;
     }
   })();
 
@@ -198,7 +230,7 @@ export default function PlayerApp({ scenarioId }: { scenarioId: string | null })
         {body}
       </div>
       {standby && content.type !== 'standby' && (
-        <StandbyView content={overlayStandby} overlay onFinish={() => setStandby(false)} />
+        <StandbyView content={overlayStandby} overlay muted={standbyMuted} onFinish={() => setStandby(false)} />
       )}
       <div className="player-bar">
         <span className="title">{config.settings.exhibitTitle}</span>
@@ -211,8 +243,13 @@ export default function PlayerApp({ scenarioId }: { scenarioId: string | null })
           {index + 1} / {steps.length}
         </span>
         <div className="spacer" />
-        <button className="btn sm ghost" onClick={prev} disabled={index === 0}>◀</button>
-        <button className="btn sm ghost" onClick={next} disabled={isLast}>▶</button>
+        {/* コントローラで操作できるときは、来場者に見える送り／戻しボタンは出さない */}
+        {!hasController && (
+          <>
+            <button className="btn sm ghost" onClick={prev} disabled={index === 0}>◀</button>
+            <button className="btn sm ghost" onClick={next} disabled={isLast}>▶</button>
+          </>
+        )}
       </div>
     </div>
   );

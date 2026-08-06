@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Interactive2Content, TokenCandidate } from '../types';
 import type { StepProps } from './PlayerApp';
 import { api, errText } from '../lib/api';
+import { isSubmitEnter } from '../lib/ime';
 
 /** API が使えないときの簡易候補（デモ継続用） */
 function offlineCandidates(text: string, topK: number): TokenCandidate[] {
@@ -106,7 +107,7 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
           placeholder={content.placeholder}
           value={seed}
           onChange={(e) => setSeed(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && start()}
+          onKeyDown={(e) => isSubmitEnter(e) && start()}
         />
         {content.examples.length > 0 && (
           <div className="row" style={{ flexWrap: 'wrap', justifyContent: 'center' }}>
