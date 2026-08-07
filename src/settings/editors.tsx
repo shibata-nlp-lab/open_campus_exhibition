@@ -516,6 +516,83 @@ function RuriPicker({ c, patch }: { c: Interactive1Content; patch: Patch<Interac
   );
 }
 
+/** llm-jp の埋め込み層のサイズ選択と事前ダウンロード */
+function LlmJpPicker({ c, patch }: { c: Interactive1Content; patch: Patch<Interactive1Content> }) {
+  const [models, setModels] = useState<Array<{ size: string; label: string; mb: number; dim: number; ready: boolean }>>([]);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const refresh = () => api.llmjp.models().then(setModels);
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  const size = c.llmjpSize ?? '150m';
+  const current = models.find((m) => m.size === size);
+
+  return (
+    <>
+      <Field
+        label="埋め込み層を借りるモデル"
+        hint="モデル全体ではなく、埋め込み層（トークンID → ベクトルの表）だけを取得します。"
+        helpTone="ok"
+        help={
+          <>
+            大きいほど次元は上がりますが、「近いことば」の見え方も変わります。手元で確かめた結果は次のとおりです。
+            <br />
+            <span className="mono">150m ： 学校 → 中学校・小学校・高校 ／ 未来 → 将来・近未来・次世代</span>
+            <br />
+            <span className="mono">1.8b ： 学校 → がっこう・校長・授業 ／ 未来 → みらい・ミライ・近未来</span>
+            <br />
+            1.8b は「みらい／ミライ」のような<strong>表記ゆれ</strong>を上位に返しがちで、150m のほうが
+            <strong>類義語・上位下位語</strong>を返します。展示で「意味が近いことば」を見せる目的なら 150m が向きます。
+          </>
+        }
+      >
+        <select
+          className="select"
+          value={size}
+          onChange={(e) => patch((x) => void (x.llmjpSize = e.target.value as Interactive1Content['llmjpSize']))}
+        >
+          {models.map((m) => (
+            <option key={m.size} value={m.size}>
+              {m.label} — {m.mb}MB / {m.dim}次元{m.ready ? '（取得済み）' : ''}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <div className="row" style={{ marginBottom: 14 }}>
+        <button
+          className="btn"
+          disabled={busy || current?.ready}
+          onClick={async () => {
+            setBusy(true);
+            setMsg(null);
+            try {
+              await api.llmjp.prepare(size);
+              await refresh();
+              setMsg('ダウンロードが完了しました。');
+            } catch (e) {
+              setMsg(errText(e));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {current?.ready ? '取得済み' : busy ? 'ダウンロード中…' : '埋め込み層を事前ダウンロード'}
+        </button>
+        {busy && <div className="spin" />}
+      </div>
+      {msg && <div className="banner ok" style={{ marginBottom: 14 }}>{msg}</div>}
+      {!current?.ready && (
+        <div className="banner warn" style={{ marginBottom: 14 }}>
+          未取得です。展示当日にネットワークが不安定だと困るので、事前にダウンロードしておいてください。
+        </div>
+      )}
+    </>
+  );
+}
+
 function Interactive1Editor({ c, patch }: { c: Interactive1Content; patch: Patch<Interactive1Content> }) {
   return (
     <>
@@ -532,12 +609,22 @@ function Interactive1Editor({ c, patch }: { c: Interactive1Content; patch: Patch
 
       <Field
         label="ベクトル化（埋め込み）の取得元"
-        helpTone={(c.embeddingSource ?? 'openai') === 'ruri' ? 'ok' : 'warn'}
+        helpTone={(c.embeddingSource ?? 'openai') === 'openai' ? 'warn' : 'ok'}
         help={
           (c.embeddingSource ?? 'openai') === 'ruri' ? (
             <>
               日本語に特化したモデルをこのPC内で動かします。APIキー不要・通信なしで、
               3,800語のベクトル化も数秒で終わります（API経由より高速）。
+            </>
+          ) : (c.embeddingSource ?? 'openai') === 'llmjp' ? (
+            <>
+              LLM がトークンIDを最初にベクトルへ変換する表（埋め込み層）を、そのまま引きます。
+              モデルを動かすのではなく<strong>表を引くだけ</strong>なので、APIキー不要・通信なしで一瞬です。
+              <br />
+              トークナイザも llm-jp にしておくと、<strong>画面に出ているトークンIDが、そのまま表の行番号</strong>に
+              なります。「この数字で表を引くとベクトルが出てくる」という説明がそのまま成立します。
+              <br />
+              複数トークンに割れる語（「トレーニング」など）は、各トークンのベクトルの平均を使います。
             </>
           ) : (
             <>多言語モデルなので日本語の精度はローカルの Ruri に劣る場合があります。APIキーと通信が必要です。</>
@@ -553,9 +640,11 @@ function Interactive1Editor({ c, patch }: { c: Interactive1Content; patch: Patch
         >
           <option value="openai">OpenAI Embeddings API（要APIキー）</option>
           <option value="ruri">ローカル日本語モデル Ruri v3（cl-nagoya）</option>
+          <option value="llmjp">llm-jp の埋め込み層（トークンIDで表を引く）</option>
         </select>
       </Field>
       {(c.embeddingSource ?? 'openai') === 'ruri' && <RuriPicker c={c} patch={patch} />}
+      {(c.embeddingSource ?? 'openai') === 'llmjp' && <LlmJpPicker c={c} patch={patch} />}
 
       <Field
         label="入力文を分割するトークナイザ"
@@ -601,6 +690,40 @@ function Interactive1Editor({ c, patch }: { c: Interactive1Content; patch: Patch
         </select>
       </Field>
 
+      <Toggle
+        label="単語の下に番号（トークンID）を表示する"
+        checked={c.showTokenId ?? true}
+        onChange={(v) => patch((x) => void (x.showTokenId = v))}
+      />
+
+      <Field
+        label="「意味が近いことば」の数値の出し方"
+        helpTone="ok"
+        help={
+          <>
+            <strong>1位を100%とする</strong>… 一番近いことばが必ず 100% になり、以下はそれとの比です。
+            ローカルモデルは中心化のあと値が小さくなるため、そのまま出すと「1位でも 30%」となって
+            説明しづらいのを避けられます。<strong>順位を見せたいときはこちら。</strong>
+            <br />
+            <strong>コサイン類似度そのもの</strong>… 尺度が一定なので、別の語どうしで数値を比べられます。
+            ただし 1 位でも小さい値になることがあります。<strong>数値の意味を正確に見せたいときはこちら。</strong>
+            <br />
+            どちらでも並び順は変わりません。変わるのは表示される数字だけです。
+          </>
+        }
+      >
+        <select
+          className="select"
+          value={c.similarityDisplay ?? 'relative'}
+          onChange={(e) =>
+            patch((x) => void (x.similarityDisplay = e.target.value as Interactive1Content['similarityDisplay']))
+          }
+        >
+          <option value="relative">1位を100%とした相対値</option>
+          <option value="cosine">コサイン類似度そのもの</option>
+        </select>
+      </Field>
+
       <Field
         label="「意味が近いことば」を探す対象"
         hint="来場者がトークンを選んだとき、どの語の集まりの中から近いものを探すかを決めます。"
@@ -632,7 +755,7 @@ function Interactive1Editor({ c, patch }: { c: Interactive1Content; patch: Patch
         >
           <option value="curated">辞書（同梱の厳選語彙・約120語）</option>
           <option value="tokenizer">o200k_base から抽出した日本語（約1,840語）</option>
-          <option value="llmjp">llm-jp から抽出した日本語（数万語）</option>
+          <option value="llmjp">llm-jp から抽出した日本語（頻度上位6,000語）</option>
         </select>
       </Field>
     </>

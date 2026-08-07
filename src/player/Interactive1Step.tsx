@@ -1,10 +1,17 @@
 import { useMemo, useState } from 'react';
-import type { EmbeddingSource, Interactive1Content, NeighbourSource, RuriSize, TokenizerMode } from '../types';
+import type {
+  EmbeddingSource,
+  Interactive1Content,
+  LlmJpSize,
+  NeighbourSource,
+  RuriSize,
+  TokenizerMode,
+} from '../types';
 import type { StepProps } from './PlayerApp';
 import { api, errText } from '../lib/api';
 import { isSubmitEnter } from '../lib/ime';
 import { listJapaneseTokens, tokenize, type Tok } from '../lib/tokenizer';
-import { listLlmJpVocab, tokenizeLlmJp } from '../lib/llmjp';
+import { idsForTexts, listLlmJpVocab, tokenizeLlmJp } from '../lib/llmjp';
 import { cosine, pca2, pseudoEmbed, tokenBorder, tokenColor } from '../lib/vec';
 import { VOCABULARY } from '../content/vocabulary';
 
@@ -16,13 +23,21 @@ interface EmbedSpec {
   source: EmbeddingSource;
   model: string;
   ruriSize: RuriSize;
+  llmjpSize: LlmJpSize;
 }
 
-/** 設定に応じて OpenAI かローカル Ruri を呼ぶ */
-const runEmbed = (texts: string[], spec: EmbedSpec) =>
-  spec.source === 'ruri'
-    ? api.local.embed(texts, spec.ruriSize)
-    : api.openai.embed(texts, spec.model, EMBED_DIMS);
+/** 設定に応じて OpenAI / ローカル Ruri / llm-jp の埋め込み層 を呼ぶ */
+async function runEmbed(texts: string[], spec: EmbedSpec): Promise<number[][]> {
+  if (spec.source === 'ruri') return api.local.embed(texts, spec.ruriSize);
+  if (spec.source === 'llmjp') {
+    // 分割はここ（語彙ファイルがレンダラ側にある）。メインへは トークンID だけ渡す
+    return api.llmjp.embed(await idsForTexts(texts), spec.llmjpSize);
+  }
+  return api.openai.embed(texts, spec.model, EMBED_DIMS);
+}
+
+/** 単語だけを入れると向きが偏るモデル。プール平均を引いて比べる */
+const needsCentering = (source: EmbeddingSource) => source === 'ruri' || source === 'llmjp';
 
 /**
  * 候補プール（語とその埋め込み）。
@@ -73,15 +88,13 @@ async function poolWords(source: NeighbourSource): Promise<string[]> {
   return VOCABULARY;
 }
 
-const POOL_LABEL: Record<NeighbourSource, string> = {
-  curated: '辞書',
-  tokenizer: 'o200k_base 由来の日本語',
-  llmjp: 'llm-jp 由来の日本語',
-};
-
 async function loadPool(source: NeighbourSource, spec: EmbedSpec): Promise<Pool> {
   const cacheKey =
-    spec.source === 'ruri' ? `emb_${source}_ruri-${spec.ruriSize}` : `emb_${source}_${spec.model}_${EMBED_DIMS}`;
+    spec.source === 'ruri'
+      ? `emb_${source}_ruri-${spec.ruriSize}`
+      : spec.source === 'llmjp'
+        ? `emb_${source}_llmjp-${spec.llmjpSize}`
+        : `emb_${source}_${spec.model}_${EMBED_DIMS}`;
   const memo = poolMemo.get(cacheKey);
   if (memo) return memo;
 
@@ -97,7 +110,7 @@ async function loadPool(source: NeighbourSource, spec: EmbedSpec): Promise<Pool>
           words: parsed.words,
           vectors: parsed.vectors,
           offline: false,
-          mean: spec.source === 'ruri' ? meanVector(parsed.vectors) : null,
+          mean: needsCentering(spec.source) ? meanVector(parsed.vectors) : null,
         };
         poolMemo.set(cacheKey, pool);
         return pool;
@@ -110,8 +123,10 @@ async function loadPool(source: NeighbourSource, spec: EmbedSpec): Promise<Pool>
   let pool: Pool;
   try {
     const vectors = await runEmbed(words, spec);
-    pool = { words, vectors, offline: false, mean: spec.source === 'ruri' ? meanVector(vectors) : null };
-    api.cache.write(cacheKey, JSON.stringify({ words: pool.words, vectors: pool.vectors })).catch(() => {});
+    pool = { words, vectors, offline: false, mean: needsCentering(spec.source) ? meanVector(vectors) : null };
+    // 小数4桁で十分（順位は変わらない）。生のまま書くとキャッシュが数倍に膨らむ
+    const compact = pool.vectors.map((v) => v.map((x) => Math.round(x * 1e4) / 1e4));
+    api.cache.write(cacheKey, JSON.stringify({ words: pool.words, vectors: compact })).catch(() => {});
   } catch {
     // 次元をそろえないと類似度が NaN になるので、疑似ベクトルも同じ次元で作る
     pool = { words, vectors: words.map((w) => pseudoEmbed(w, EMBED_DIMS)), offline: true, mean: null };
@@ -136,6 +151,9 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
 
   const mode = content.tokenizerMode ?? 'gpt';
   const ruriSize = content.ruriSize ?? '130m';
+  const llmjpSize = content.llmjpSize ?? '150m';
+  /** 単語の下に番号（トークンID）を出すか */
+  const showId = content.showTokenId ?? true;
 
   const run = async () => {
     const t = text.trim();
@@ -163,6 +181,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
       source: content.embeddingSource ?? 'openai',
       model: config.settings.embeddingModel,
       ruriSize,
+      llmjpSize,
     };
     const texts = tokens.map((t) => t.text);
     try {
@@ -189,7 +208,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
     }
   };
 
-  /** 選んだトークンに意味が近いことばを、プール全体から探す */
+  /** 選んだ単語に意味が近いことばを、プール全体から探す */
   const neighbours = useMemo(() => {
     if (!vectors?.[selected] || !pool) return [];
     const target = centerVec(vectors[selected], pool.mean);
@@ -198,10 +217,12 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
       .filter((x) => x.word !== tokens[selected]?.text)
       .sort((a, b) => b.sim - a.sim)
       .slice(0, 5);
-    // センタリング後の値は絶対値が小さくなるので、1位を100とした相対値で見せる
+    // relative: 1位を100とした相対値（中心化すると絶対値が小さくなるため）
+    // cosine:   コサイン類似度そのもの
     const top = list[0]?.sim ?? 1;
-    return list.map((x) => ({ ...x, shown: pool.mean ? x.sim / (top || 1) : x.sim }));
-  }, [vectors, pool, selected, tokens]);
+    const relative = (content.similarityDisplay ?? 'relative') === 'relative';
+    return list.map((x) => ({ ...x, shown: relative ? x.sim / (top || 1) : x.sim }));
+  }, [vectors, pool, selected, tokens, content.similarityDisplay]);
 
   /**
    * 地図用のプール。数千語をそのまま描くと潰れるので間引く。
@@ -221,7 +242,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
     return { idx, words: idx.map((i) => pool.words[i]), vectors: idx.map((i) => pool.vectors[i]) };
   }, [pool, neighbours]);
 
-  /** トークンとプールを同じ空間で2次元に落とす */
+  /** 単語とプールを同じ空間で2次元に落とす */
   const projected = useMemo(() => {
     if (!vectors || !mapPool) return null;
     const all = pca2([...vectors, ...mapPool.vectors]);
@@ -251,38 +272,28 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
           </div>
         )}
         <button className="btn lg primary" onClick={run} disabled={!text.trim() || busy}>
-          {busy ? '準備中…' : 'トークンに分けてみる ▶'}
+          {busy ? '準備中…' : '単語に分けてみる ▶'}
         </button>
       </div>
     );
   }
 
-  /* ---------- トークン ---------- */
+  /* ---------- 単語分割 ---------- */
   if (phase === 'tokens') {
     return (
       <div className="stage fade-in">
-        <span className="chip">STEP 1 — トークナイズ</span>
-        <h2>文章は「トークン」という小さなかたまりに分けられる</h2>
+        <span className="chip">STEP 1 — 単語分割</span>
+        <h2>文章は「単語」の小さなかたまりに分けられる</h2>
         <div className="token-line">
           {tokens.map((t, i) => (
             <span key={i} className="token" style={{ background: tokenColor(i), borderColor: tokenBorder(i) }}>
               {t.text === ' ' ? '␣' : t.text}
-              <span className="id">{t.id}</span>
+              {showId && <span className="id">{t.id}</span>}
             </span>
           ))}
         </div>
         <p className="lead">
-          {tokens.length} 個のトークン ／ 下の数字がトークンID
-          <br />
-          <span style={{ fontSize: '.75em' }}>
-            {approx
-              ? '簡易分割'
-              : usedMode === 'llmjp'
-                ? '日本語向けに作られた llm-jp のトークナイザ'
-                : usedMode === 'ruri'
-                  ? 'Ruri v3 が実際に使うトークナイザ'
-                  : 'GPT-4o と同じ o200k_base'}
-          </span>
+          {tokens.length} 個の単語{showId ? ' ／ 下の数字は単語につけられた番号' : ''}
         </p>
         <div className="row">
           <button className="btn lg" onClick={() => setPhase('input')}>入力しなおす</button>
@@ -301,7 +312,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
   return (
     <div className="stage scroll fade-in" style={{ gap: 14 }}>
       <span className="chip">STEP 2 — ベクトル化（埋め込み）</span>
-      <h2>トークンは「意味を表す数字の列」になる</h2>
+      <h2>単語は「意味を表す数字の列」になる</h2>
 
       {busy && <div className="spin" />}
       {offline && (
@@ -329,7 +340,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
       </div>
 
       <div className="vec-numbers">
-        <div className="small muted">
+        <div className="sub-caption">
           「{selectedText}」は、こんな <b>{vec.length} 次元のベクトル</b> になっている
         </div>
         <div className="vector">
@@ -352,17 +363,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
 
       {neighbours.length > 0 && (
         <div className="neighbours">
-          <div className="small muted">
-            「{selectedText}」に意味が近いことば
-            <br />
-            <span style={{ fontSize: '.9em' }}>
-              語彙: {POOL_LABEL[content.neighbourSource ?? 'curated']}（
-              {pool ? pool.words.length.toLocaleString() : 0} 語） ／ 埋め込み:{' '}
-              {(content.embeddingSource ?? 'openai') === 'ruri'
-                ? `Ruri v3 ${content.ruriSize ?? '130m'}`
-                : config.settings.embeddingModel}
-            </span>
-          </div>
+          <div className="sub-caption">「{selectedText}」に意味が近いことば</div>
           <div className="row" style={{ justifyContent: 'center', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
             {neighbours.map((n) => (
               <span key={n.word} className="neighbour">
@@ -375,13 +376,6 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
       )}
 
       <div className="map-wrap">
-        <div className="small muted" style={{ marginBottom: 6 }}>
-          意味の地図（{mapPool ? mapPool.words.length : 0} 語と一緒に、2次元へ圧縮して配置
-          {pool && mapPool && pool.words.length > mapPool.words.length
-            ? `／全 ${pool.words.length.toLocaleString()} 語から間引き`
-            : ''}
-          ）
-        </div>
         <Scatter
           vocabPoints={projected?.vocab ?? []}
           vocabLabels={mapPool?.words ?? []}

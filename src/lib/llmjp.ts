@@ -10,7 +10,7 @@
  *   - 文頭に ▁ を付与
  * のみ行う（llm-jp は pre_tokenizer を持たない）。
  */
-import type { Tok } from './tokenizer';
+import { isJapaneseVocabToken, type Tok } from './tokenizer';
 
 const SPACE = '▁'; // ▁
 
@@ -142,11 +142,51 @@ export async function tokenizeLlmJp(text: string): Promise<{ tokens: Tok[]; appr
   return { tokens: out, approximate: false };
 }
 
-/** 語彙のうち日本語の語らしいものを返す（近傍プール用に使える） */
+/**
+ * 語ごとのトークンID列を返す。llm-jp の埋め込み層を引くために使う。
+ *
+ * 分割をレンダラ側で行うのは、語彙ファイルがここにしか無いため。
+ * メインプロセスへは ID だけを渡し、向こうは表を引いて平均するだけにしてある。
+ */
+export async function idsForTexts(texts: string[]): Promise<number[][]> {
+  const out: number[][] = [];
+  for (const t of texts) {
+    const r = await tokenizeLlmJp(t);
+    out.push(r ? r.tokens.map((tok) => tok.id) : []);
+  }
+  return out;
+}
+
+/**
+ * 近傍プールに載せる語数の上限。
+ *
+ * 条件を満たす語は 26,000 以上あるが、全部の埋め込みを持つとキャッシュが
+ * 260MB 規模の JSON になり、書き出しで画面が止まる。展示で見せるのは上位数語なので、
+ * よく使われる語だけに絞る。
+ */
+const POOL_LIMIT = 6000;
+
+/**
+ * 語彙のうち日本語の語らしいものを返す（近傍プール用）。
+ *
+ * - 判定は o200k_base 側と同じ基準（かなを含む、または常用漢字のみ）。
+ *   素の文字種だけで見ると `获取` のような中国語が残ってしまう
+ * - 語頭を表す `▁学校` と語中の `学校` は別トークンだが表示は同じなので重複を落とす
+ *   （落とさないと「大阪 / 大阪」のように同じ語が並ぶ）
+ * - 語彙ファイルの並び順は頻度順ではない（先頭は `一一` `一二` … のような数字）ため、
+ *   Unigram のスコア（対数確率）で並べ替えてから上位を取る
+ */
 export async function listLlmJpVocab(): Promise<string[]> {
   const v = await load();
   if (!v) return [];
-  return v.tokens
-    .map((t) => t.replace(new RegExp(SPACE, 'g'), ''))
-    .filter((t) => /^[ぁ-んァ-ヴー一-龯々]{2,12}$/.test(t));
+  const seen = new Set<string>();
+  const rows: Array<{ word: string; score: number }> = [];
+  for (let i = 0; i < v.tokens.length; i++) {
+    const word = v.tokens[i].replace(new RegExp(SPACE, 'g'), '');
+    if (!isJapaneseVocabToken(word) || seen.has(word)) continue;
+    seen.add(word);
+    rows.push({ word, score: v.scores[i] });
+  }
+  rows.sort((a, b) => b.score - a.score);
+  return rows.slice(0, POOL_LIMIT).map((r) => r.word);
 }

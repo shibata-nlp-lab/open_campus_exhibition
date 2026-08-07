@@ -172,3 +172,18 @@ describe('migrate — 教材の取り込み', () => {
     expect(migrate(cfg).contents).toHaveLength(count);
   });
 });
+
+describe('migrate — 文言の言い換え', () => {
+  it('手を入れていない初期の問いかけだけ差し替える', () => {
+    const cfg = migrate(
+      base({
+        contents: [
+          { id: 'c1', type: 'interactive1', name: '体験', prompt: '好きな文章を入力してみよう' } as never,
+          { id: 'c2', type: 'interactive1', name: '体験2', prompt: '自分で書いた問いかけ' } as never,
+        ],
+      })
+    );
+    expect((cfg.contents[0] as Interactive1Content).prompt).toBe('好きな文を入力してみよう');
+    expect((cfg.contents[1] as Interactive1Content).prompt).toBe('自分で書いた問いかけ');
+  });
+});

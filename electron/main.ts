@@ -17,9 +17,24 @@ import {
   writeCache,
 } from './config';
 import { resultsToCsv } from './csv';
+import { closeSplash, showSplash } from './splash';
+import {
+  addUser,
+  authState,
+  effectiveRole,
+  listUsers,
+  login,
+  logout,
+  removeUser,
+  setPin,
+  setRole,
+  usersPath,
+} from './users';
+import { canOpenTab } from '../src/permissions';
 import { embed, nextTokenCandidates, verifyKey } from './openai';
 import { embedLocal, isModelReady, prepareModel, RURI_MODELS, tokenizeRuri, type RuriSize } from './localEmbed';
-import type { ApiResult, AppConfig, ClearResult, DisplayInfo, PlaybackCommand, PlaybackState } from '../src/types';
+import { embedLlmJpIds, isLlmJpReady, LLMJP_MODELS, prepareLlmJpEmbed, type LlmJpSize } from './llmjpEmbed';
+import type { ApiResult, AppConfig, ClearResult, DisplayInfo, PlaybackCommand, PlaybackState, Role } from '../src/types';
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 
@@ -90,9 +105,15 @@ function createSettingsWindow() {
     minHeight: 700,
     title: 'LLM展示 — 設定',
     backgroundColor: '#0f1522',
+    // 中身が描けるまで出さない。空白が一瞬見えるのを避ける（代わりにスプラッシュを出す）
+    show: false,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), sandbox: false },
   });
   settingsWindow.loadURL(rendererUrl('/settings'));
+  settingsWindow.once('ready-to-show', () => {
+    closeSplash();
+    settingsWindow?.show();
+  });
   settingsWindow.on('closed', () => (settingsWindow = null));
 }
 
@@ -208,17 +229,20 @@ function createPlayerWindow(scenarioId: string) {
     title: '進行画面',
     backgroundColor: '#070b13',
     autoHideMenuBar: true,
+    // 来場者に白い画面を見せないよう、描けるまで隠しておく
+    show: false,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), sandbox: false },
   });
   playerWindow.loadURL(rendererUrl(`/player?scenario=${encodeURIComponent(scenarioId)}`));
 
-  if (cfg.settings.fullscreen) {
-    // ウィンドウを対象ディスプレイへ移してから全画面化しないと主画面で全画面になる
-    playerWindow.once('ready-to-show', () => {
+  playerWindow.once('ready-to-show', () => {
+    if (cfg.settings.fullscreen) {
+      // ウィンドウを対象ディスプレイへ移してから全画面化しないと主画面で全画面になる
       playerWindow?.setBounds(target.bounds);
       playerWindow?.setFullScreen(true);
-    });
-  }
+    }
+    playerWindow?.show();
+  });
 
   playerWindow.on('closed', () => {
     playerWindow = null;
@@ -352,6 +376,8 @@ function registerIpc() {
   }));
   ipcMain.handle('key:set', (_e, key: string) =>
     asResult(async () => {
+      // タブを隠すだけでは足りないので、ここでも権限を見る
+      if (!canOpenTab(effectiveRole(), 'api')) throw new Error('APIキーを変更する権限がありません。');
       if (key) {
         const ok = await verifyKey(key).catch(() => false);
         if (!ok) throw new Error('APIキーの検証に失敗しました（ネットワークまたはキーを確認してください）');
@@ -394,6 +420,21 @@ function registerIpc() {
     asResult(() => tokenizeRuri(args.text, args.size))
   );
 
+  /* --- llm-jp の埋め込み層（トークンIDで表を引くだけ） --- */
+  ipcMain.handle('llmjp:models', () =>
+    Object.entries(LLMJP_MODELS).map(([size, m]) => ({
+      size,
+      label: m.label,
+      mb: m.mb,
+      dim: m.dim,
+      ready: isLlmJpReady(size as LlmJpSize),
+    }))
+  );
+  ipcMain.handle('llmjp:prepare', (_e, size: LlmJpSize) => asResult(() => prepareLlmJpEmbed(size)));
+  ipcMain.handle('llmjp:embed', (_e, args: { groups: number[][]; size: LlmJpSize }) =>
+    asResult(async () => embedLlmJpIds(args.groups, args.size))
+  );
+
   /* --- ウィンドウ / ディスプレイ --- */
   ipcMain.handle('player:open', (_e, scenarioId: string) => createPlayerWindow(scenarioId));
   ipcMain.handle('player:close', () => {
@@ -423,6 +464,29 @@ function registerIpc() {
   ipcMain.handle('playback:current', () => lastPlaybackState);
   ipcMain.on('controller:typing', (_e, on: boolean) => (controllerTyping = Boolean(on)));
   ipcMain.handle('controller:exists', () => Boolean(controllerWindow && !controllerWindow.isDestroyed()));
+
+  /* --- ユーザーと権限 --- */
+  ipcMain.handle('auth:state', () => authState());
+  ipcMain.handle('auth:role', () => effectiveRole());
+  ipcMain.handle('auth:login', (_e, args: { id: string; pin: string }) =>
+    asResult(async () => login(args.id, args.pin))
+  );
+  ipcMain.handle('auth:logout', () => {
+    logout();
+    return true;
+  });
+  ipcMain.handle('auth:list', () => listUsers());
+  ipcMain.handle('auth:add', (_e, args: { name: string; pin: string; role: Role }) =>
+    asResult(async () => addUser(args.name, args.pin, args.role))
+  );
+  ipcMain.handle('auth:setRole', (_e, args: { id: string; role: Role }) =>
+    asResult(async () => setRole(args.id, args.role))
+  );
+  ipcMain.handle('auth:setPin', (_e, args: { id: string; pin: string }) =>
+    asResult(async () => setPin(args.id, args.pin))
+  );
+  ipcMain.handle('auth:remove', (_e, id: string) => asResult(async () => removeUser(id)));
+  ipcMain.handle('auth:reveal', () => shell.showItemInFolder(usersPath()));
 
   /* --- 集計 --- */
   ipcMain.handle('result:append', (_e, record) => {
@@ -466,6 +530,7 @@ function registerIpc() {
 /* ---------------- 起動 ---------------- */
 
 app.whenReady().then(() => {
+  showSplash();
   ensureDirs();
   registerProtocols();
   registerIpc();

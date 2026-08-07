@@ -126,9 +126,9 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
   const finished = steps >= content.maxSteps || (cands.length === 0 && !busy);
 
   return (
-    <div className="stage fade-in" style={{ gap: 20 }}>
+    <div className="stage predict fade-in">
       <div className="row">
-        <span className="chip">次の1トークンを予測中</span>
+        <span className="chip lg">次の1語を予測中</span>
         {offline && <span className="chip" style={{ background: '#37291a', color: '#ffd9a1' }}>オフライン簡易モード</span>}
       </div>
 
@@ -160,7 +160,7 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
             ))}
           </div>
           <p className="small muted">
-            {steps} / {content.maxSteps} トークン生成 — LLMはこの「選ぶ」を延々くり返しているだけです
+            {steps} / {content.maxSteps} 語ぶん生成 — LLMはこの「選ぶ」を延々くり返しているだけです
           </p>
         </>
       )}
@@ -169,7 +169,7 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
         <div className="col fade-in" style={{ alignItems: 'center' }}>
           <h2>これがLLMの文章生成です</h2>
           <p className="lead" style={{ maxWidth: 900 }}>
-            次のトークンの確率を計算 → 1つ選ぶ → また計算。このくり返しで文章ができています。
+            次の語の確率を計算 → 1つ選ぶ → また計算。このくり返しで文章ができています。
           </p>
         </div>
       )}
