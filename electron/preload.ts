@@ -38,6 +38,11 @@ const api = {
     importText: (name: string, text: string, ext: string): Promise<string> =>
       ipcRenderer.invoke('asset:importText', { name, text, ext }),
     readText: (rel: string): Promise<string | null> => ipcRenderer.invoke('asset:readText', rel),
+    /**
+     * 中身をそのまま読む。PDF のように oc:// では取り込めないものに使う
+     * （pdf.js は http/https 以外を XHR で取りに行き、ステータス 0 で失敗する）。
+     */
+    read: (rel: string): Promise<Uint8Array> => unwrap(ipcRenderer.invoke('asset:read', rel)),
     writeText: (rel: string, text: string): Promise<boolean> => ipcRenderer.invoke('asset:writeText', { rel, text }),
     url: (rel: string) => `oc://assets/${encodeURIComponent(rel)}`,
   },

@@ -335,6 +335,14 @@ function registerIpc() {
       return null;
     }
   });
+  // PDF など、レンダラ側で中身のバイト列が必要なもの
+  ipcMain.handle('asset:read', (_e, rel: string) =>
+    asResult(async () => {
+      const abs = assetAbsolutePath(rel);
+      if (!fs.existsSync(abs)) throw new Error(`ファイルが見つかりません：${path.basename(rel)}`);
+      return fs.readFileSync(abs);
+    })
+  );
   ipcMain.handle('asset:writeText', (_e, args: { rel: string; text: string }) => {
     fs.writeFileSync(assetAbsolutePath(args.rel), args.text, 'utf-8');
     return true;
