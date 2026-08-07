@@ -63,7 +63,7 @@ function isUntouchedV1Samples(config: AppConfig): boolean {
 }
 
 /** 旧バージョンの config を現行スキーマに合わせる（証明書の削除・新規フィールドの補完） */
-function migrate(config: AppConfig): AppConfig {
+export function migrate(config: AppConfig): AppConfig {
   const known = new Set([
     'video',
     'slide',

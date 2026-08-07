@@ -22,7 +22,9 @@ export function pca2(vectors: number[][]): Array<[number, number]> {
   const X = vectors.map((v) => sub(v, mean));
 
   const power = (deflate: number[][] | null): number[] => {
-    let w = new Array(dim).fill(0).map((_, i) => Math.sin(i * 12.9898) * 43758.5453 % 1);
+    // 初期ベクトル。i から始めると第0成分がちょうど 0 になり、
+    // データがその軸だけに広がっている場合に反復が 0 ベクトルへ潰れるので i+1 から始める。
+    let w = new Array(dim).fill(0).map((_, i) => (Math.sin((i + 1) * 12.9898) * 43758.5453) % 1);
     for (let iter = 0; iter < 60; iter++) {
       const next = new Array(dim).fill(0);
       for (const x of X) {
@@ -35,7 +37,9 @@ export function pca2(vectors: number[][]): Array<[number, number]> {
           for (let i = 0; i < dim; i++) next[i] -= c * d[i];
         }
       }
-      const nn = norm(next);
+      // 全点が同じ位置にあるなど、伸ばす方向が無いときは打ち切る（0 除算で NaN にしない）
+      const nn = Math.sqrt(dot(next, next));
+      if (nn < 1e-12) break;
       w = next.map((v) => v / nn);
     }
     return w;

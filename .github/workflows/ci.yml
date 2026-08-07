@@ -1,6 +1,6 @@
 name: CI
 
-# main への push と Pull Request で、型と本体ビルドが通ることだけを確認する軽い検査。
+# main への push と Pull Request で、型・テスト・本体ビルドが通ることを確認する軽い検査。
 # 配布ファイル（dmg / exe）の作成は release.yml が担当する。
 on:
   push:
@@ -26,6 +26,9 @@ jobs:
 
       - name: 型チェック
         run: npm run typecheck
+
+      - name: テスト
+        run: npm test
 
       - name: ビルド（main / preload / renderer）
         run: npm run build

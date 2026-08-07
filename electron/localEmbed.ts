@@ -11,6 +11,7 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { userDir } from './config';
+import { toDisplayTokens, type RuriToken } from './ruriTokens';
 
 export type RuriSize = '30m' | '130m' | '310m';
 
@@ -110,45 +111,15 @@ export async function prepareModel(size: RuriSize): Promise<{ ready: boolean }> 
   return { ready: isModelReady(size) };
 }
 
-const BYTE_TOKEN = /^<0x([0-9A-Fa-f]{2})>$/;
-
 /**
  * Ruri v3 が実際に使うトークナイザで分割する（進行画面の表示用）。
- *
- * SentencePiece Unigram なので `▁` が空白を表す。語彙にない文字は `<0xNN>` の
- * バイト列に落ちるので、連続するバイトトークンはまとめて文字に戻してから返す
- * （画面に `<0xE3>` と出しても展示にならないため）。
+ * 表示向けの整形（バイトトークンの復元など）は toDisplayTokens が行う。
  */
-export async function tokenizeRuri(text: string, size: RuriSize): Promise<Array<{ id: number; text: string }>> {
+export async function tokenizeRuri(text: string, size: RuriSize): Promise<RuriToken[]> {
   const tokenizer = await getTokenizer(size);
   const pieces: string[] = tokenizer.tokenize(text, { add_special_tokens: false });
   const ids: number[] = tokenizer.convert_tokens_to_ids(pieces);
-
-  const out: Array<{ id: number; text: string }> = [];
-  for (let i = 0; i < pieces.length; i++) {
-    const m = BYTE_TOKEN.exec(pieces[i]);
-    if (!m) {
-      out.push({ id: ids[i] ?? 0, text: pieces[i].replace(/▁/g, ' ') });
-      continue;
-    }
-    // バイトトークンの連続を1文字ぶんずつ復元する
-    const start = i;
-    const bytes: number[] = [];
-    while (i < pieces.length) {
-      const b = BYTE_TOKEN.exec(pieces[i]);
-      if (!b) break;
-      bytes.push(parseInt(b[1], 16));
-      i++;
-    }
-    i--;
-    const decoded = new TextDecoder().decode(Uint8Array.from(bytes));
-    for (let k = start; k <= i; k++) out.push({ id: ids[k] ?? 0, text: decoded });
-  }
-
-  // 先頭の空白は入力にはなかったものなので落とす
-  if (out.length && out[0].text.trim() === '') out.shift();
-  if (out.length) out[0] = { ...out[0], text: out[0].text.replace(/^ /, '') };
-  return out;
+  return toDisplayTokens(pieces, ids);
 }
 
 export async function embedLocal(texts: string[], size: RuriSize): Promise<number[][]> {

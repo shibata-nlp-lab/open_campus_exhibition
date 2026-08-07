@@ -2,16 +2,7 @@ import { useEffect, useState } from 'react';
 import type { StandbyContent } from '../types';
 import type { StepProps } from './PlayerApp';
 import { useAudio } from './useAudio';
-
-/** 開始時刻までの残り時間（分）。過ぎていたら null */
-function minutesUntil(hhmm: string, now: Date): number | null {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
-  if (!m) return null;
-  const target = new Date(now);
-  target.setHours(Number(m[1]), Number(m[2]), 0, 0);
-  const diff = Math.round((target.getTime() - now.getTime()) / 60000);
-  return diff >= 0 ? diff : null;
-}
+import { minutesUntil } from '../lib/time';
 
 /** 待機画面の中身。シナリオのステップとしても、オーバーレイとしても使う */
 export function StandbyView({

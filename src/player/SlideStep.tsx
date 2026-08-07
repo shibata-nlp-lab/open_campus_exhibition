@@ -5,31 +5,11 @@ import type { StepProps } from './PlayerApp';
 import { api, errText } from '../lib/api';
 import { useAudio, useStepKeys } from './useAudio';
 import { DEFAULT_INTRO_MARKDOWN } from '../defaults';
+import { resolveRelativeAssets, splitMarkdown } from '../lib/markdown';
 
-/** Marp のフロントマター / ディレクティブを取り除き、--- で分割 */
-function splitMarkdown(src: string): string[] {
-  let text = src.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, ''); // フロントマター
-  text = text.replace(/^<!--[\s\S]*?-->\s*$/gm, ''); // Marp のコメントディレクティブ
-  const pages = text.split(/^\s*---\s*$/m).map((p) => p.trim()).filter((p) => p.length > 0);
-  return pages.length ? pages : [text];
-}
-
-/**
- * 外部 .md を参照している場合、相対パスの画像を ocfile:// に置き換えて表示できるようにする。
- * baseDir は .md が置かれているディレクトリの絶対パス。
- */
-function resolveRelativeAssets(html: string, baseDir: string | null): string {
-  if (!baseDir) return html;
-  return html.replace(/(src|href)="([^"]+)"/g, (whole, attr, value: string) => {
-    if (/^([a-z]+:|#|\/\/)/i.test(value)) return whole;
-    try {
-      const abs = new URL(value, `file://${baseDir.endsWith('/') ? baseDir : baseDir + '/'}`).pathname;
-      return `${attr}="${api.file.url(decodeURIComponent(abs))}"`;
-    } catch {
-      return whole;
-    }
-  });
-}
+/** 相対パスの画像を ocfile:// に置き換える（変換関数だけ渡して純粋な処理は lib 側に置いてある） */
+const withAssets = (html: string, baseDir: string | null) =>
+  resolveRelativeAssets(html, baseDir, api.file.url);
 
 function MarkdownSlides({
   src,
@@ -69,7 +49,7 @@ function MarkdownSlides({
         className="slide-md fade-in"
         key={page}
         dangerouslySetInnerHTML={{
-          __html: resolveRelativeAssets(marked.parse(pages[page]) as string, baseDir),
+          __html: withAssets(marked.parse(pages[page]) as string, baseDir),
         }}
       />
       <SlideBar page={page} total={pages.length} onPrev={prev} onNext={next} />
