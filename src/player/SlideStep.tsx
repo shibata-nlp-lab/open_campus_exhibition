@@ -53,8 +53,10 @@ function MarkdownSlides({
         key={page}
         style={{ background: current.backgroundColor, color: current.color }}
       >
-        {/* フロントマターの style: 。@scope で囲って、アプリ側の画面に漏れないようにする */}
+        {/* style: と <style>。@scope で囲って、アプリ側の画面に漏れないようにする */}
         {doc.style && <style>{`@scope (.marp-scope) {\n${doc.style}\n}`}</style>}
+        {/* <style scoped> はこのページの分だけ（key={page} で貼り替わる） */}
+        {current.style && <style>{`@scope (.marp-scope) {\n${current.style}\n}`}</style>}
         <section
           className={current.classes.join(' ')}
           dangerouslySetInnerHTML={{ __html: withAssets(marked.parse(current.markdown) as string, baseDir) }}

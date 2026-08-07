@@ -2,11 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { isMarpDocument, renderMarp, stripRemoteImports, themeNameOf } from '../src/lib/marp';
 
 describe('isMarpDocument', () => {
-  it('marp: true があるときだけ true', () => {
+  it('marp: true か theme: があるときに true', () => {
     expect(isMarpDocument('---\nmarp: true\n---\n# A')).toBe(true);
     expect(isMarpDocument('---\nmarp: false\n---\n# A')).toBe(false);
-    expect(isMarpDocument('---\ntheme: gaia\n---\n# A')).toBe(false);
+    // theme を指定している時点で Marp のつもりで書かれている
+    expect(isMarpDocument('---\ntheme: gaia\n---\n# A')).toBe(true);
     expect(isMarpDocument('# A')).toBe(false);
+  });
+
+  it('先頭の --- をページ区切りのつもりで書いたものは Marp 扱いしない', () => {
+    expect(isMarpDocument('---\n\n<!-- _class: center -->\n\n# おわり\n\n---\n')).toBe(false);
   });
 
   it('既存の教材（フロントマター無し）は従来どおり扱う', () => {

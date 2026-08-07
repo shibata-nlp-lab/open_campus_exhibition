@@ -17,8 +17,15 @@ export interface MarpRender {
   css: string;
 }
 
-/** この Markdown を Marp Core で描くか */
-export const isMarpDocument = (src: string) => frontMatterOf(src).marp === 'true';
+/**
+ * この Markdown を Marp Core で描くか。
+ * `marp: true` のほかに `theme:` だけ書いてあるものも拾う
+ * （テーマを指定している時点で Marp のつもりで書かれているため）。
+ */
+export const isMarpDocument = (src: string) => {
+  const fm = frontMatterOf(src);
+  return fm.marp === 'true' || !!fm.theme;
+};
 
 /** 自作テーマ CSS の名前（`/* @theme name *​/`）を取り出す */
 export function themeNameOf(css: string): string | null {

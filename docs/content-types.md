@@ -55,9 +55,9 @@ interface StepProps<T extends Content = Content> {
 | `inline` | `inlineText`（**config.json の中**。assets には置かない） |
 | `file` | `externalPath`（ユーザーの .md を絶対パスで参照。Marp で編集した内容が毎回反映される） |
 
-**フロントマターに `marp: true` があるものは [src/lib/marp.ts](../src/lib/marp.ts) が
+**フロントマターに `marp: true` か `theme:` があるものは [src/lib/marp.ts](../src/lib/marp.ts) が
 Marp Core に渡します。** テーマ CSS（`default` / `gaia` / `uncover` と、設定画面で登録した自作テーマ）が
-そのまま効きます。`marp: true` は Marp 自身のオプトイン用フラグでもあるので、
+そのまま効きます。これらは Marp のつもりで書かれた .md だけに付くフラグなので、
 **付いていない既存の教材は従来の簡易描画のままで、見た目が変わりません**。
 
 Marp Core は 3.5MB あるので動的 import にしてあり、Marp のスライドを開くまで読み込みません。
@@ -66,16 +66,24 @@ Marp Core は 3.5MB あるので動的 import にしてあり、Marp のスラ�
 アプリ側の CSS で `100%` に上書きしています。
 外部フォントの `@import` は落とします（回線の無い会場で待たされないため）。
 
-`marp: true` が無い場合の簡易描画は [src/lib/markdown.ts](../src/lib/markdown.ts) の `parseMarp()` が解釈します。
-フロントマターの `style:` とページごとのディレクティブ（`_class` など）を取り出し、
+どちらも無い場合の簡易描画は [src/lib/markdown.ts](../src/lib/markdown.ts) の `parseMarp()` が解釈します。
+フロントマターの `style:`、本文中の `<style>` / `<style scoped>`、
+ページごとのディレクティブ（`_class` など）を取り出し、
 `^---$` でページに割ります（コードフェンスの中の `---` では割りません）。
 外部 .md の相対パス画像は `ocfile://` に書き換えます（`resolveRelativeAssets`）。
 
-`style:` は `@scope (.marp-scope) { … }` で囲ってから注入するので、**スライドの CSS が
-アプリの他の画面へ漏れません**。ページ本文は `<section class="…">` で包むため、
-`section.title * { … }` のような Marp 由来のセレクタがそのまま効きます。
+CSS はいずれも `@scope (.marp-scope) { … }` で囲ってから注入するので、**スライドの CSS が
+アプリの他の画面へ漏れません**。`<style scoped>` はそのページの分だけ貼り、
+それ以外はスライド全体に効かせます（Marp と同じ）。
+ページ本文は `<section class="…">` で包むため、`section.title * { … }` のような
+Marp 由来のセレクタがそのまま効きます。アプリ側が section に当てている既定値は
+`:where()` で詳細度 0 にしてあるので、スライド側の `section { … }` が素直に上書きできます。
 
-**`theme:` は当たりません**（テーマ CSS を同梱していないため）。デザインを保ちたいなら PDF 形式で登録します。
+**フロントマターは `key: value` を 1 つ以上含むときだけフロントマターとして扱います。**
+先頭の `---` をページ区切りのつもりで書いた .md を、次の `---` まで丸ごと食べて
+真っ白にしてしまわないためです（Marp 本体はこの場合 1 ページ目が空になります）。
+
+簡易描画では `theme:` は当たりません（テーマを使うなら Marp Core 側に回ります）。
 
 PDF は pdfjs-dist でページ送りします。`autoAdvanceSec` は markdown / pdf でのみ有効です。
 

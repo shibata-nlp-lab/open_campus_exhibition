@@ -9,12 +9,15 @@
  *   - ページ内のディレクティブコメント `<!-- _class: title -->` など
  *     先頭が `_` のものはそのページだけ、無いものはそれ以降のページにも効く（Marp と同じ）
  *   - `key: value` の形でないコメント（`<!-- ただのメモ -->`）は表示から取り除くだけ
+ *   - ページ本文中の `<style>` / `<style scoped>` … 前者はスライド全体、後者はそのページだけ
  */
 
 /** 1ページぶん */
 export interface MarpPage {
-  /** 本文（ディレクティブのコメントを取り除いたもの） */
+  /** 本文（ディレクティブのコメントと `<style>` を取り除いたもの） */
   markdown: string;
+  /** このページだけに効く CSS（`<style scoped>`） */
+  style: string;
   /** `class:` で指定されたクラス。CSS の `section.title` などに使う */
   classes: string[];
   /** ページ番号を出すか */
@@ -25,7 +28,7 @@ export interface MarpPage {
 
 export interface MarpDoc {
   pages: MarpPage[];
-  /** フロントマターの `style:` の中身 */
+  /** スライド全体に効く CSS（フロントマターの `style:` と、scoped でない `<style>`） */
   style: string;
 }
 
@@ -42,6 +45,11 @@ const BOOL = (v: string) => v.trim().toLowerCase() === 'true';
 /**
  * フロントマターを読む。YAML のうち「key: value」と「key: |」のブロックだけを見る簡易実装。
  * 先頭が `---` の行で始まっていないときはフロントマター無しとみなす。
+ *
+ * `key: value` が 1 つも無いときも**フロントマター無し**として本文を丸ごと返す。
+ * 先頭の `---` をページ区切りのつもりで書いた .md を、
+ * 次の `---` までまるごと食べて真っ白にしてしまわないため
+ * （Marp 本体はこの場合 1 ページ目が空になる。展示では事故のほうが痛いので、こちらは拾う）。
  */
 function readFrontMatter(lines: string[]): { data: Record<string, string>; rest: string[] } {
   if (lines[0]?.trim() !== '---') return { data: {}, rest: lines };
@@ -74,7 +82,25 @@ function readFrontMatter(lines: string[]): { data: Record<string, string>; rest:
       data[key] = raw.trim().replace(/^["']|["']$/g, '');
     }
   }
+  if (Object.keys(data).length === 0) return { data: {}, rest: lines };
   return { data, rest: lines.slice(end + 1) };
+}
+
+/**
+ * ページ本文から `<style>` を抜き出す（本文からは取り除く）。
+ * `scoped` が付いていればそのページだけ、無ければスライド全体に効く（Marp と同じ）。
+ */
+function takeStyles(text: string): { markdown: string; scoped: string[]; global: string[] } {
+  const scoped: string[] = [];
+  const global: string[] = [];
+  const markdown = text.replace(
+    /<style\b([^>]*)>([\s\S]*?)<\/style\s*>/gi,
+    (_whole, attrs: string, css: string) => {
+      (/\bscoped\b/i.test(attrs) ? scoped : global).push(css.trim());
+      return '';
+    }
+  );
+  return { markdown, scoped, global };
 }
 
 /**
@@ -153,12 +179,19 @@ export function parseMarp(src: string): MarpDoc {
   };
 
   const pages: MarpPage[] = [];
+  // scoped でない <style> はスライド全体に効くので、どのページで書かれていてもまとめて集める
+  const globalStyles: string[] = data.style ? [data.style] : [];
+
   for (const lines of splitPages(rest)) {
-    const { markdown, own } = takeDirectives(lines.join('\n'), carried);
+    const { markdown: withStyles, own } = takeDirectives(lines.join('\n'), carried);
+    const { markdown, scoped, global } = takeStyles(withStyles);
+    globalStyles.push(...global);
+
     const body = markdown.trim();
-    if (!body) continue; // 空ページ（末尾の --- など）は落とす
+    if (!body) continue; // 空ページ（末尾の --- など）は落とす。style だけは上で回収済み
     pages.push({
       markdown: body,
+      style: scoped.join('\n'),
       classes: own.classes,
       paginate: own.paginate,
       backgroundColor: own.backgroundColor,
@@ -167,8 +200,8 @@ export function parseMarp(src: string): MarpDoc {
   }
 
   return {
-    pages: pages.length ? pages : [{ markdown: '', classes: [], paginate: false }],
-    style: data.style ?? '',
+    pages: pages.length ? pages : [{ markdown: '', style: '', classes: [], paginate: false }],
+    style: globalStyles.join('\n'),
   };
 }
 
