@@ -16,6 +16,7 @@ import {
   userDir,
   writeCache,
 } from './config';
+import { resultsToCsv } from './csv';
 import { embed, nextTokenCandidates, verifyKey } from './openai';
 import { embedLocal, isModelReady, prepareModel, RURI_MODELS, tokenizeRuri, type RuriSize } from './localEmbed';
 import type { ApiResult, AppConfig, ClearResult, DisplayInfo, PlaybackCommand, PlaybackState } from '../src/types';
@@ -457,13 +458,7 @@ function registerIpc() {
     const rows = readResults();
     const res = await dialog.showSaveDialog({ defaultPath: 'results.csv', filters: [{ name: 'CSV', extensions: ['csv'] }] });
     if (res.canceled || !res.filePath) return null;
-    const header = 'ts,kind,scenarioId,contentId,payload\n';
-    const body = rows
-      .map((r) => [r.ts, r.kind, r.scenarioId ?? '', r.contentId, JSON.stringify(r.payload)]
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-        .join(','))
-      .join('\n');
-    fs.writeFileSync(res.filePath, '﻿' + header + body, 'utf-8');
+    fs.writeFileSync(res.filePath, resultsToCsv(rows), 'utf-8');
     return res.filePath;
   });
 }
