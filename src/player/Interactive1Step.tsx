@@ -340,7 +340,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
       </div>
 
       <div className="vec-numbers">
-        <div className="vec-caption">
+        <div className="sub-caption">
           「{selectedText}」は、こんな <b>{vec.length} 次元のベクトル</b> になっている
         </div>
         <div className="vector">
@@ -363,7 +363,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
 
       {neighbours.length > 0 && (
         <div className="neighbours">
-          <div className="small muted">「{selectedText}」に意味が近いことば</div>
+          <div className="sub-caption">「{selectedText}」に意味が近いことば</div>
           <div className="row" style={{ justifyContent: 'center', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
             {neighbours.map((n) => (
               <span key={n.word} className="neighbour">

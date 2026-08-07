@@ -412,10 +412,11 @@ table.data th { color: var(--fg-dim); font-weight: 600; font-size: 11px; }
 }
 .launcher h1 { margin: 0; }
 
-/* ---------------- 体験①：ベクトルの見出し ---------------- */
-/* 見出し（h2）より一段下。強弱をつけるため意図的に小さくしている */
-.vec-caption { font-size: clamp(15px, 1.5vw, 21px); color: var(--fg-dim); }
-.vec-caption b { color: var(--fg); }
+/* ---------------- 体験①：見出しの下に置く説明 ---------------- */
+/* 見出し（h2）より一段下。強弱をつけるため意図的に小さくしている。
+   「…次元のベクトルになっている」と「…に意味が近いことば」で共通 */
+.sub-caption { font-size: clamp(15px, 1.5vw, 21px); color: var(--fg-dim); }
+.sub-caption b { color: var(--fg); }
 
 /* ---------------- 体験②：画面全体を使う ---------------- */
 .chip.lg { font-size: clamp(16px, 1.8vw, 26px); padding: 6px 18px; border-radius: 999px; }
