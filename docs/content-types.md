@@ -1,6 +1,6 @@
 # コンテンツ種別
 
-コンテンツは展示の部品です。8 種類あり、`type` フィールドで判別する判別可能ユニオン
+コンテンツは展示の部品です。9 種類あり、`type` フィールドで判別する判別可能ユニオン
 （[src/types.ts](../src/types.ts) の `Content`）になっています。
 
 ```
@@ -17,6 +17,7 @@ type ──▶ 型 ──────────────────▶ 描
 | `game` | `GameContent` | [GameStep](../src/player/GameStep.tsx) | 不要 | `game` |
 | `survey` | `SurveyContent` | [SurveyStep](../src/player/SurveyStep.tsx) | 不要 | `survey` |
 | `standby` | `StandbyContent` | [StandbyStep](../src/player/StandbyStep.tsx) | 不要 | — |
+| `betting` | `BettingContent` | [BettingStep](../src/player/BettingStep.tsx) | 不要 | — |
 
 共通フィールドは `ContentBase` です。`note` は**コントローラにだけ**出る進行用の覚え書きで、
 来場者側には出しません。`sampleId` は同梱教材の重複取り込みを防ぐための識別子です。
@@ -124,6 +125,12 @@ PDF は pdfjs-dist でページ送りします。`autoAdvanceSec` は markdown /
 書き換えた内容はそのまま次回も残ります。
 
 `autoAdvanceSec` が 0 より大きいとカウントダウンして自動で次へ進みます。
+
+### betting
+
+高校生向けではなく**裏モード**です。次の単語の上位3つを馬券の形で当てます。
+その場で推論はせず、Colab で作った層ごとの確率を CSV で取り込みます。
+仕様は [betting-mode.md](betting-mode.md) にまとめています。
 
 ### interactive1 / interactive2
 

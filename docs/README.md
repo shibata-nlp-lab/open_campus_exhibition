@@ -8,8 +8,9 @@
 | [architecture.md](architecture.md) | プロセスとウィンドウの構成、起動から表示までの流れ、キー入力が二系統ある理由 |
 | [ipc.md](ipc.md) | `window.api`（preload）の全 API とメインプロセス側ハンドラの対応表 |
 | [data.md](data.md) | `config.json` のスキーマ、保存先のファイル群、集計ログの形式、マイグレーション |
-| [content-types.md](content-types.md) | コンテンツ 8 種の型と描画側の挙動、種別を追加する手順 |
+| [content-types.md](content-types.md) | コンテンツ 9 種の型と描画側の挙動、種別を追加する手順 |
 | [permissions.md](permissions.md) | 展示員ユーザーと役割ごとの権限、PIN の扱い |
+| [betting-mode.md](betting-mode.md) | 馬券風 次単語予想（裏モード）。オッズ計算・順位変動の補正・コース |
 | [nlp.md](nlp.md) | トークナイザ 3 種と埋め込み 2 種の実装、キャッシュ、オフライン時の縮退 |
 | [development.md](development.md) | 環境構築、npm スクリプト、テスト、CI/リリース、既知の落とし穴、コードの書き方 |
 

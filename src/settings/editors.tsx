@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import type {
   AudioSetting,
+  BettingContent,
+  BettingRace,
   Content,
   GameContent,
   Interactive1Content,
@@ -15,6 +17,9 @@ import type {
 import { uid } from '../defaults';
 import { api, errText } from '../lib/api';
 import { AssetPicker, Field, NumberField, Toggle } from './common';
+import { parseRacesCsv } from '../lib/racecsv';
+import { raceOdds } from '../lib/odds';
+import { buildRaceCurve } from '../lib/race';
 
 type Patch<T> = (fn: (c: T) => void) => void;
 
@@ -993,6 +998,271 @@ function StandbyEditor({ c, patch }: { c: StandbyContent; patch: Patch<StandbyCo
   );
 }
 
+
+/* ---------------- 馬券風 次単語予想（裏モード） ---------------- */
+
+function BettingEditor({ c, patch }: { c: BettingContent; patch: Patch<BettingContent> }) {
+  const [raceIdx, setRaceIdx] = useState(0);
+  const [notice, setNotice] = useState<string[]>([]);
+  const race = c.races[Math.min(raceIdx, Math.max(0, c.races.length - 1))];
+
+  /** Colab が書き出した races.csv を取り込む */
+  const importCsv = async () => {
+    const abs = await api.file.pick([{ name: 'CSV', extensions: ['csv'] }]);
+    if (!abs) return;
+    try {
+      const { races, warnings } = parseRacesCsv(await api.file.readText(abs));
+      if (races.length) patch((x) => void (x.races = races));
+      setRaceIdx(0);
+      setNotice(races.length ? [`${races.length} レースを取り込みました。`, ...warnings] : warnings);
+    } catch (e) {
+      setNotice([errText(e)]);
+    }
+  };
+
+  /** オッズのシードを振り直す（同じシードなら毎回同じオッズになるため） */
+  const reseed = () => patch((x) => void (x.races[raceIdx].seed = (Math.random() * 2 ** 32) >>> 0));
+
+  const preview = race ? raceOdds(race.entries, race.seed) : null;
+  const curve = race
+    ? buildRaceCurve(
+        race.entries.map((e) => e.layerProbs),
+        race.entries.map((e) => e.finalProb),
+        c.metersPerLayer
+      )
+    : null;
+
+  return (
+    <>
+      <div className="banner warn" style={{ marginBottom: 14 }}>
+        高校生向けではなく<b>裏モード</b>です。その場で推論はせず、Colab
+        で作った層ごとの確率を CSV で取り込んで使います。作り方は docs/betting-mode.md を参照してください。
+      </div>
+
+      <div className="row" style={{ marginBottom: 12 }}>
+        <button className="btn" onClick={importCsv}>races.csv を取り込む…</button>
+        <span className="small muted">{c.races.length} レース登録済み</span>
+      </div>
+      {notice.length > 0 && (
+        <div className="banner" style={{ marginBottom: 12 }}>
+          {notice.map((n, i) => (
+            <div key={i} className="small">{n}</div>
+          ))}
+        </div>
+      )}
+
+      <NumberField
+        label="初期所持金"
+        value={c.startingMoney}
+        min={1000}
+        max={10000000}
+        step={10000}
+        suffix="円"
+        onChange={(v) => patch((x) => void (x.startingMoney = v))}
+      />
+      <NumberField
+        label="レース数"
+        value={c.raceCount}
+        min={1}
+        max={12}
+        onChange={(v) => patch((x) => void (x.raceCount = v))}
+      />
+      <NumberField
+        label="1層あたりの距離"
+        value={c.metersPerLayer}
+        min={20}
+        max={400}
+        step={10}
+        suffix="m"
+        hint="層数 × この値がレース距離になります。100m だと 24層で 2400m。"
+        onChange={(v) => patch((x) => void (x.metersPerLayer = v))}
+      />
+      <Toggle
+        label="各レースの開始時に所持金を初期額へ戻す（0円でのゲームオーバーが起きなくなります）"
+        checked={c.refillPerRace}
+        onChange={(v) => patch((x) => void (x.refillPerRace = v))}
+      />
+
+      {race && preview && curve && (
+        <div className="card" style={{ marginTop: 14 }}>
+          <div className="row" style={{ marginBottom: 10, flexWrap: 'wrap' }}>
+            <select className="input" value={raceIdx} onChange={(e) => setRaceIdx(Number(e.target.value))}>
+              {c.races.map((r, i) => (
+                <option key={r.id} value={i}>
+                  {r.name}（{r.entries.length}頭 / {r.entries[0]?.layerProbs.length ?? 0}層）
+                </option>
+              ))}
+            </select>
+            <button className="btn sm" onClick={reseed}>オッズを引き直す</button>
+            <span className="small muted">
+              「{race.prompt}」 {curve.distance}m
+            </span>
+          </div>
+
+          <RankChart curve={curve} words={race.entries.map((e) => e.word)} />
+
+          <table className="racecard" style={{ width: '100%', marginTop: 10 }}>
+            <thead>
+              <tr>
+                <th>馬番</th>
+                <th>単語</th>
+                <th>最終確率</th>
+                <th>オッズ平均</th>
+                <th>オッズ分散</th>
+                <th>単勝</th>
+              </tr>
+            </thead>
+            <tbody>
+              {race.entries.map((e, i) => (
+                <tr key={i}>
+                  <td className="mono">{i + 1}</td>
+                  <td className="word">{e.word}</td>
+                  <td>
+                    <input
+                      className="input mono"
+                      style={{ width: 90 }}
+                      type="number"
+                      step="0.0001"
+                      min="0"
+                      max="1"
+                      value={e.finalProb}
+                      onChange={(ev) =>
+                        patch((x) => void (x.races[raceIdx].entries[i].finalProb = Number(ev.target.value)))
+                      }
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="input mono"
+                      style={{ width: 80 }}
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      value={e.oddsMean}
+                      onChange={(ev) =>
+                        patch((x) => void (x.races[raceIdx].entries[i].oddsMean = Number(ev.target.value)))
+                      }
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="input mono"
+                      style={{ width: 80 }}
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={e.oddsVar}
+                      onChange={(ev) =>
+                        patch((x) => void (x.races[raceIdx].entries[i].oddsVar = Number(ev.target.value)))
+                      }
+                    />
+                  </td>
+                  <td className="mono odds">{preview.win[i].toFixed(1)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <LayerEditor
+            race={race}
+            onChange={(wi, li, v) =>
+              patch((x) => void (x.races[raceIdx].entries[wi].layerProbs[li] = v))
+            }
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
+/** 補正後の順位変動。Colab のグラフと同じものをアプリ側でも見られるようにする */
+function RankChart({ curve, words }: { curve: ReturnType<typeof buildRaceCurve>; words: string[] }) {
+  const W = 640;
+  const H = 200;
+  const n = curve.positions.length;
+  const T = curve.positions[0]?.length ?? 0;
+  if (!n || !T) return null;
+  const x = (t: number) => (t / (T - 1 || 1)) * (W - 60) + 40;
+  const y = (rank: number) => 14 + (rank / (n - 1 || 1)) * (H - 28);
+
+  // 各層での順位
+  const ranks: number[][] = [];
+  for (let t = 0; t < T; t++) {
+    const order = curve.positions
+      .map((p, i) => ({ v: p[t], i }))
+      .sort((a, b) => b.v - a.v)
+      .map((o) => o.i);
+    const r = new Array<number>(n).fill(0);
+    order.forEach((i, k) => (r[i] = k));
+    ranks.push(r);
+  }
+
+  const hue = (i: number) => `hsl(${(i * 47) % 360} 70% 62%)`;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ background: '#0b1220', borderRadius: 8 }}>
+      {curve.positions.map((_, i) => (
+        <g key={i}>
+          <path
+            d={ranks.map((r, t) => `${t === 0 ? 'M' : 'L'}${x(t)} ${y(r[i])}`).join(' ')}
+            stroke={hue(i)}
+            strokeWidth={1.8}
+            fill="none"
+            opacity={0.9}
+          />
+          <text x={x(T - 1) + 4} y={y(ranks[T - 1][i]) + 4} fontSize={9} fill={hue(i)}>
+            {words[i]}
+          </text>
+        </g>
+      ))}
+      <text x={4} y={12} fontSize={9} fill="#7f8ea8">1着</text>
+      <text x={4} y={H - 4} fontSize={9} fill="#7f8ea8">最下位</text>
+    </svg>
+  );
+}
+
+/** 層ごとの確率を直接いじる。粘らせたい語を手で調整するため */
+function LayerEditor({
+  race,
+  onChange,
+}: {
+  race: BettingRace;
+  onChange: (wordIndex: number, layerIndex: number, value: number) => void;
+}) {
+  const [wi, setWi] = useState(0);
+  const e = race.entries[Math.min(wi, race.entries.length - 1)];
+  if (!e) return null;
+  return (
+    <div style={{ marginTop: 12 }}>
+      <Field label="層ごとの確率を編集">
+        <select className="input" value={wi} onChange={(ev) => setWi(Number(ev.target.value))}>
+          {race.entries.map((x, i) => (
+            <option key={i} value={i}>
+              {i + 1}. {x.word}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
+        {e.layerProbs.map((p, li) => (
+          <label key={li} className="small" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span className="muted">L{li + 1}</span>
+            <input
+              className="input mono"
+              style={{ width: 84 }}
+              type="number"
+              step="0.001"
+              min="0"
+              max="1"
+              value={p}
+              onChange={(ev) => onChange(wi, li, Math.max(0, Number(ev.target.value)))}
+            />
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- ディスパッチャ ---------------- */
 
 export function ContentEditor({ content, patch }: { content: Content; patch: Patch<Content> }) {
@@ -1013,5 +1283,7 @@ export function ContentEditor({ content, patch }: { content: Content; patch: Pat
       return <SurveyEditor c={content} patch={patch as Patch<SurveyContent>} />;
     case 'standby':
       return <StandbyEditor c={content} patch={patch as Patch<StandbyContent>} />;
+    case 'betting':
+      return <BettingEditor c={content} patch={patch as Patch<BettingContent>} />;
   }
 }

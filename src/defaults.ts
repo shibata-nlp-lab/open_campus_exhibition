@@ -1,6 +1,7 @@
 import type {
   AppConfig,
   AudioSetting,
+  BettingContent,
   Content,
   ContentType,
   GameContent,
@@ -53,6 +54,7 @@ export const CONTENT_LABELS: Record<ContentType, string> = {
   game: 'ゲーム（次の単語当て）',
   survey: 'アンケート',
   standby: '待機画面',
+  betting: '馬券風 次単語予想（裏モード）',
 };
 
 /** 各コンテンツ種別の空テンプレート */
@@ -168,6 +170,17 @@ export function createContent(type: ContentType): Content {
         autoAdvanceSec: 0,
         audio: emptyAudio(),
       } as StandbyContent;
+    case 'betting':
+      // レースは CSV から取り込む前提なので空で作る
+      return {
+        ...base,
+        type,
+        races: [],
+        startingMoney: 100000,
+        raceCount: 5,
+        refillPerRace: false,
+        metersPerLayer: 100,
+      } as BettingContent;
   }
 }
 

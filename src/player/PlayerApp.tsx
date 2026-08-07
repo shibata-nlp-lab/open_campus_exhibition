@@ -8,6 +8,7 @@ import Interactive1Step from './Interactive1Step';
 import Interactive2Step from './Interactive2Step';
 import GameStep from './GameStep';
 import SurveyStep from './SurveyStep';
+import BettingStep from './BettingStep';
 import StandbyStep, { StandbyView } from './StandbyStep';
 
 export interface StepProps<T extends Content = Content> {
@@ -238,6 +239,7 @@ export default function PlayerApp({
       case 'interactive2': return <Interactive2Step {...(stepProps as StepProps<typeof content>)} />;
       case 'game': return <GameStep {...(stepProps as StepProps<typeof content>)} />;
       case 'survey': return <SurveyStep {...(stepProps as StepProps<typeof content>)} />;
+      case 'betting': return <BettingStep {...(stepProps as StepProps<typeof content>)} />;
       case 'standby':
         return (
           <StandbyStep

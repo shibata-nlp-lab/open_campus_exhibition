@@ -8,7 +8,8 @@ export type ContentType =
   | 'interactive2'
   | 'game'
   | 'survey'
-  | 'standby';
+  | 'standby'
+  | 'betting';
 
 export interface ContentBase {
   id: string;
@@ -212,6 +213,48 @@ export interface StandbyContent extends ContentBase {
   audio: AudioSetting;
 }
 
+/* ---------------- 馬券風 次単語予想（裏モード） ---------------- */
+
+/** 出走馬 ＝ 候補の語 */
+export interface BettingEntry {
+  word: string;
+  /** 最終出力確率 0..1。着順の根拠になる */
+  finalProb: number;
+  /** 単勝オッズの平均 */
+  oddsMean: number;
+  /** 単勝オッズの分散 */
+  oddsVar: number;
+  /** 層ごとの確率（層1から）。長さがそのままレース距離になる */
+  layerProbs: number[];
+}
+
+export interface BettingRace {
+  id: string;
+  name: string;
+  prompt: string;
+  model: string;
+  /** オッズ生成の乱数シード。同じシードなら毎回同じオッズになる */
+  seed: number;
+  entries: BettingEntry[];
+}
+
+/**
+ * 高校生向けではなく、大学生・教員向けの裏モード。
+ * その場で推論はせず、Colab で作った確率を取り込んで使う。
+ */
+export interface BettingContent extends ContentBase {
+  type: 'betting';
+  races: BettingRace[];
+  /** 初期所持金（円） */
+  startingMoney: number;
+  /** 何レースやるか */
+  raceCount: number;
+  /** true: 各レース開始時に所持金を初期額へ戻す */
+  refillPerRace: boolean;
+  /** 1層あたりの距離（m） */
+  metersPerLayer: number;
+}
+
 export type Content =
   | VideoContent
   | SlideContent
@@ -220,7 +263,8 @@ export type Content =
   | Interactive2Content
   | GameContent
   | SurveyContent
-  | StandbyContent;
+  | StandbyContent
+  | BettingContent;
 
 export interface ScenarioStep {
   id: string;
