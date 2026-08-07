@@ -10,7 +10,7 @@
 | [data.md](data.md) | `config.json` のスキーマ、保存先のファイル群、集計ログの形式、マイグレーション |
 | [content-types.md](content-types.md) | コンテンツ 8 種の型と描画側の挙動、種別を追加する手順 |
 | [nlp.md](nlp.md) | トークナイザ 3 種と埋め込み 2 種の実装、キャッシュ、オフライン時の縮退 |
-| [development.md](development.md) | 環境構築、npm スクリプト、CI/リリース、既知の落とし穴、コードの書き方 |
+| [development.md](development.md) | 環境構築、npm スクリプト、テスト、CI/リリース、既知の落とし穴、コードの書き方 |
 
 ## 3分でわかる全体像
 
