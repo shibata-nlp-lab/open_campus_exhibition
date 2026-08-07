@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { listLlmJpVocab, tokenizeLlmJp } from '../src/lib/llmjp';
+import { idsForTexts, listLlmJpVocab, tokenizeLlmJp } from '../src/lib/llmjp';
+import { isJapaneseVocabToken } from '../src/lib/tokenizer';
 
 const split = async (s: string) => {
   const r = await tokenizeLlmJp(s);
@@ -80,5 +81,58 @@ describe('listLlmJpVocab', () => {
 
   it('2回呼んでも同じ結果（キャッシュが効いても壊れない）', async () => {
     expect(await listLlmJpVocab()).toEqual(await listLlmJpVocab());
+  });
+});
+
+describe('idsForTexts（埋め込み層を引くための ID 列）', () => {
+  it('語ごとにトークンID の配列を返す', async () => {
+    const ids = await idsForTexts(['東京大学', '猫']);
+    expect(ids).toHaveLength(2);
+    expect(ids[0].length).toBeGreaterThan(0);
+    for (const g of ids) for (const id of g) expect(id).toBeGreaterThanOrEqual(0);
+  });
+
+  it('分割数と ID の数が一致する', async () => {
+    const r = await tokenizeLlmJp('機械学習を勉強したい');
+    const ids = await idsForTexts(['機械学習を勉強したい']);
+    expect(ids[0]).toHaveLength(r!.tokens.length);
+  });
+
+  it('空文字は空の配列（平均プーリング側で 0 ベクトルになる）', async () => {
+    expect(await idsForTexts([''])).toEqual([[]]);
+  });
+
+  it('同じ語からは必ず同じ ID 列が出る', async () => {
+    expect(await idsForTexts(['学校'])).toEqual(await idsForTexts(['学校']));
+  });
+});
+
+describe('listLlmJpVocab の重複排除', () => {
+  it('同じ表層の語が 2 回出てこない（▁学校 と 学校 は別トークンだが表示は同じ）', async () => {
+    const words = await listLlmJpVocab();
+    expect(new Set(words).size).toBe(words.length);
+  });
+});
+
+describe('listLlmJpVocab のプール品質', () => {
+  it('上限 6,000 語に収める（キャッシュが数百MBに膨らむのを防ぐ）', async () => {
+    expect(await listLlmJpVocab()).toHaveLength(6000);
+  });
+
+  it('中国語が混じらない（o200k 側と同じ日本語判定を通す）', async () => {
+    const words = await listLlmJpVocab();
+    expect(words).not.toContain('获取');
+    expect(words).not.toContain('一个');
+  });
+
+  it('数字の羅列ではなく、よく使う語が入る（語彙ファイルの並び順ではなくスコア順）', async () => {
+    const words = await listLlmJpVocab();
+    // 語彙ファイルの先頭は 一一 一二 … なので、並び順のまま取ると数字だらけになる
+    expect(words.slice(0, 50).filter((w) => /^[一二三四五六七八九十]{2}$/.test(w)).length).toBeLessThan(5);
+    expect(words).toContain('日本');
+  });
+
+  it('すべて日本語の語として妥当', async () => {
+    for (const w of await listLlmJpVocab()) expect(isJapaneseVocabToken(w)).toBe(true);
   });
 });

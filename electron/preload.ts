@@ -70,6 +70,14 @@ const api = {
     tokenize: (text: string, size: string): Promise<Array<{ id: number; text: string }>> =>
       unwrap(ipcRenderer.invoke('local:tokenize', { text, size })),
   },
+  /** llm-jp の埋め込み層。分割はレンダラ側で行い、ここには トークンID だけを渡す */
+  llmjp: {
+    models: (): Promise<Array<{ size: string; label: string; mb: number; dim: number; ready: boolean }>> =>
+      ipcRenderer.invoke('llmjp:models'),
+    prepare: (size: string): Promise<{ ready: boolean }> => unwrap(ipcRenderer.invoke('llmjp:prepare', size)),
+    embed: (groups: number[][], size: string): Promise<number[][]> =>
+      unwrap(ipcRenderer.invoke('llmjp:embed', { groups, size })),
+  },
   player: {
     open: (scenarioId: string) => ipcRenderer.invoke('player:open', scenarioId),
     close: () => ipcRenderer.invoke('player:close'),

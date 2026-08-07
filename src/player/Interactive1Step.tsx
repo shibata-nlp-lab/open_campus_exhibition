@@ -1,10 +1,17 @@
 import { useMemo, useState } from 'react';
-import type { EmbeddingSource, Interactive1Content, NeighbourSource, RuriSize, TokenizerMode } from '../types';
+import type {
+  EmbeddingSource,
+  Interactive1Content,
+  LlmJpSize,
+  NeighbourSource,
+  RuriSize,
+  TokenizerMode,
+} from '../types';
 import type { StepProps } from './PlayerApp';
 import { api, errText } from '../lib/api';
 import { isSubmitEnter } from '../lib/ime';
 import { listJapaneseTokens, tokenize, type Tok } from '../lib/tokenizer';
-import { listLlmJpVocab, tokenizeLlmJp } from '../lib/llmjp';
+import { idsForTexts, listLlmJpVocab, tokenizeLlmJp } from '../lib/llmjp';
 import { cosine, pca2, pseudoEmbed, tokenBorder, tokenColor } from '../lib/vec';
 import { VOCABULARY } from '../content/vocabulary';
 
@@ -16,13 +23,21 @@ interface EmbedSpec {
   source: EmbeddingSource;
   model: string;
   ruriSize: RuriSize;
+  llmjpSize: LlmJpSize;
 }
 
-/** 設定に応じて OpenAI かローカル Ruri を呼ぶ */
-const runEmbed = (texts: string[], spec: EmbedSpec) =>
-  spec.source === 'ruri'
-    ? api.local.embed(texts, spec.ruriSize)
-    : api.openai.embed(texts, spec.model, EMBED_DIMS);
+/** 設定に応じて OpenAI / ローカル Ruri / llm-jp の埋め込み層 を呼ぶ */
+async function runEmbed(texts: string[], spec: EmbedSpec): Promise<number[][]> {
+  if (spec.source === 'ruri') return api.local.embed(texts, spec.ruriSize);
+  if (spec.source === 'llmjp') {
+    // 分割はここ（語彙ファイルがレンダラ側にある）。メインへは トークンID だけ渡す
+    return api.llmjp.embed(await idsForTexts(texts), spec.llmjpSize);
+  }
+  return api.openai.embed(texts, spec.model, EMBED_DIMS);
+}
+
+/** 単語だけを入れると向きが偏るモデル。プール平均を引いて比べる */
+const needsCentering = (source: EmbeddingSource) => source === 'ruri' || source === 'llmjp';
 
 /**
  * 候補プール（語とその埋め込み）。
@@ -81,7 +96,11 @@ const POOL_LABEL: Record<NeighbourSource, string> = {
 
 async function loadPool(source: NeighbourSource, spec: EmbedSpec): Promise<Pool> {
   const cacheKey =
-    spec.source === 'ruri' ? `emb_${source}_ruri-${spec.ruriSize}` : `emb_${source}_${spec.model}_${EMBED_DIMS}`;
+    spec.source === 'ruri'
+      ? `emb_${source}_ruri-${spec.ruriSize}`
+      : spec.source === 'llmjp'
+        ? `emb_${source}_llmjp-${spec.llmjpSize}`
+        : `emb_${source}_${spec.model}_${EMBED_DIMS}`;
   const memo = poolMemo.get(cacheKey);
   if (memo) return memo;
 
@@ -97,7 +116,7 @@ async function loadPool(source: NeighbourSource, spec: EmbedSpec): Promise<Pool>
           words: parsed.words,
           vectors: parsed.vectors,
           offline: false,
-          mean: spec.source === 'ruri' ? meanVector(parsed.vectors) : null,
+          mean: needsCentering(spec.source) ? meanVector(parsed.vectors) : null,
         };
         poolMemo.set(cacheKey, pool);
         return pool;
@@ -110,8 +129,10 @@ async function loadPool(source: NeighbourSource, spec: EmbedSpec): Promise<Pool>
   let pool: Pool;
   try {
     const vectors = await runEmbed(words, spec);
-    pool = { words, vectors, offline: false, mean: spec.source === 'ruri' ? meanVector(vectors) : null };
-    api.cache.write(cacheKey, JSON.stringify({ words: pool.words, vectors: pool.vectors })).catch(() => {});
+    pool = { words, vectors, offline: false, mean: needsCentering(spec.source) ? meanVector(vectors) : null };
+    // 小数4桁で十分（順位は変わらない）。生のまま書くとキャッシュが数倍に膨らむ
+    const compact = pool.vectors.map((v) => v.map((x) => Math.round(x * 1e4) / 1e4));
+    api.cache.write(cacheKey, JSON.stringify({ words: pool.words, vectors: compact })).catch(() => {});
   } catch {
     // 次元をそろえないと類似度が NaN になるので、疑似ベクトルも同じ次元で作る
     pool = { words, vectors: words.map((w) => pseudoEmbed(w, EMBED_DIMS)), offline: true, mean: null };
@@ -136,6 +157,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
 
   const mode = content.tokenizerMode ?? 'gpt';
   const ruriSize = content.ruriSize ?? '130m';
+  const llmjpSize = content.llmjpSize ?? '150m';
 
   const run = async () => {
     const t = text.trim();
@@ -163,6 +185,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
       source: content.embeddingSource ?? 'openai',
       model: config.settings.embeddingModel,
       ruriSize,
+      llmjpSize,
     };
     const texts = tokens.map((t) => t.text);
     try {
@@ -359,8 +382,10 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
               語彙: {POOL_LABEL[content.neighbourSource ?? 'curated']}（
               {pool ? pool.words.length.toLocaleString() : 0} 語） ／ 埋め込み:{' '}
               {(content.embeddingSource ?? 'openai') === 'ruri'
-                ? `Ruri v3 ${content.ruriSize ?? '130m'}`
-                : config.settings.embeddingModel}
+                ? `Ruri v3 ${ruriSize}`
+                : (content.embeddingSource ?? 'openai') === 'llmjp'
+                  ? `llm-jp-3-${llmjpSize} の埋め込み層`
+                  : config.settings.embeddingModel}
             </span>
           </div>
           <div className="row" style={{ justifyContent: 'center', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>

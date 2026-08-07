@@ -19,6 +19,7 @@ import {
 import { resultsToCsv } from './csv';
 import { embed, nextTokenCandidates, verifyKey } from './openai';
 import { embedLocal, isModelReady, prepareModel, RURI_MODELS, tokenizeRuri, type RuriSize } from './localEmbed';
+import { embedLlmJpIds, isLlmJpReady, LLMJP_MODELS, prepareLlmJpEmbed, type LlmJpSize } from './llmjpEmbed';
 import type { ApiResult, AppConfig, ClearResult, DisplayInfo, PlaybackCommand, PlaybackState } from '../src/types';
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
@@ -392,6 +393,21 @@ function registerIpc() {
   );
   ipcMain.handle('local:tokenize', (_e, args: { text: string; size: RuriSize }) =>
     asResult(() => tokenizeRuri(args.text, args.size))
+  );
+
+  /* --- llm-jp の埋め込み層（トークンIDで表を引くだけ） --- */
+  ipcMain.handle('llmjp:models', () =>
+    Object.entries(LLMJP_MODELS).map(([size, m]) => ({
+      size,
+      label: m.label,
+      mb: m.mb,
+      dim: m.dim,
+      ready: isLlmJpReady(size as LlmJpSize),
+    }))
+  );
+  ipcMain.handle('llmjp:prepare', (_e, size: LlmJpSize) => asResult(() => prepareLlmJpEmbed(size)));
+  ipcMain.handle('llmjp:embed', (_e, args: { groups: number[][]; size: LlmJpSize }) =>
+    asResult(async () => embedLlmJpIds(args.groups, args.size))
   );
 
   /* --- ウィンドウ / ディスプレイ --- */

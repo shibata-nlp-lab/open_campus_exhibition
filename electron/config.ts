@@ -85,6 +85,7 @@ export function migrate(config: AppConfig): AppConfig {
       c.tokenizerMode ??= 'gpt';
       c.embeddingSource ??= 'openai';
       c.ruriSize ??= '130m';
+      c.llmjpSize ??= '150m';
     }
     if (c.type === 'standby') {
       c.nextStartMode ??= 'hidden';

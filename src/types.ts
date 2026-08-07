@@ -88,7 +88,7 @@ export interface QuizContent extends ContentBase {
  * 「意味が近いことば」を探す候補プール。
  * - curated:   同梱の厳選語彙（約120語）。結果が読みやすい
  * - tokenizer: o200k_base から抽出した日本語（約1,840語）。GPT系の実物だが中国語や5ch定型も混ざる
- * - llmjp:     llm-jp の語彙から抽出した日本語（約数万語）。日本語モデルの語彙
+ * - llmjp:     llm-jp の語彙から抽出した日本語（頻度上位 6,000 語）。日本語モデルの語彙
  */
 export type NeighbourSource = 'curated' | 'tokenizer' | 'llmjp';
 
@@ -105,11 +105,16 @@ export type TokenizerMode = 'gpt' | 'llmjp' | 'ruri';
  * ベクトル化（埋め込み）の取得元。
  * - openai: OpenAI Embeddings API（多言語・要APIキー）
  * - ruri:   ローカルの日本語モデル Ruri v3（初回だけモデルをダウンロード。以降はオフラインで高速）
+ * - llmjp:  llm-jp の埋め込み層そのもの。トークンIDで表を引くだけなので、
+ *           画面に出しているIDとベクトルの対応をそのまま見せられる
  */
-export type EmbeddingSource = 'openai' | 'ruri';
+export type EmbeddingSource = 'openai' | 'ruri' | 'llmjp';
 
 /** Ruri v3 のモデルサイズ */
 export type RuriSize = '30m' | '130m' | '310m';
+
+/** 埋め込み層を借りてくる llm-jp-3 のモデルサイズ（大きいほど次元が高い） */
+export type LlmJpSize = '150m' | '440m' | '1.8b';
 
 export interface Interactive1Content extends ContentBase {
   type: 'interactive1';
@@ -120,6 +125,7 @@ export interface Interactive1Content extends ContentBase {
   tokenizerMode: TokenizerMode;
   embeddingSource: EmbeddingSource;
   ruriSize: RuriSize;
+  llmjpSize: LlmJpSize;
 }
 
 export interface Interactive2Content extends ContentBase {

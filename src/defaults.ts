@@ -105,6 +105,7 @@ export function createContent(type: ContentType): Content {
         tokenizerMode: 'gpt',
         embeddingSource: 'openai',
         ruriSize: '130m',
+        llmjpSize: '150m',
       } as Interactive1Content;
     case 'interactive2':
       return {
