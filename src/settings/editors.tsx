@@ -612,9 +612,8 @@ function Interactive1Editor({ c, patch }: { c: Interactive1Content; patch: Patch
       <div className="banner warn" style={{ marginBottom: 14 }}>
         入力文をトークンに分割し、ベクトルにして可視化します。分割の流儀とベクトル化の取得元は下で選べます。
       </div>
-      <Field label="来場者への問いかけ">
-        <input className="input" value={c.prompt} onChange={(e) => patch((x) => void (x.prompt = e.target.value))} />
-      </Field>
+      {/* 「来場者への問いかけ」は画面から外した（入力欄とボタンだけで用が足りるため）。
+          設定だけ残すと直しても何も変わらず紛らわしいので、項目ごと出さない */}
       <Field label="入力欄のプレースホルダ">
         <input className="input" value={c.placeholder} onChange={(e) => patch((x) => void (x.placeholder = e.target.value))} />
       </Field>

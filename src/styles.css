@@ -463,6 +463,33 @@ table.data th { color: var(--fg-dim); font-weight: 600; font-size: 11px; }
 .stage.entry .btn.sm { font-size: clamp(13px, 1.3vw, 20px); padding: 6px 14px; border-radius: 999px; }
 .stage.entry .btn.lg { font-size: clamp(19px, 2.1vw, 32px); padding: clamp(14px, 1.8vh, 22px) clamp(28px, 3vw, 48px); }
 
+/* ---------------- 単語分割の画面：画面をいっぱいに使う ---------------- */
+/* 単語のカードが主役なので、まずそこを大きくする。
+   数が増えたときは token-line 側でスクロールさせ、画面そのものは動かさない */
+.stage.tokens {
+  justify-content: center;
+  gap: clamp(18px, 3vh, 40px);
+  padding: 3vh 4vw;
+  width: 100%;
+  overflow: hidden;
+}
+.stage.tokens h2 { font-size: clamp(28px, 3.6vw, 56px); }
+.stage.tokens p.lead { font-size: clamp(18px, 2vw, 30px); }
+.stage.tokens .token-line {
+  width: min(1600px, 94vw);
+  max-width: none;
+  max-height: 52vh;
+  overflow-y: auto;
+  gap: clamp(6px, 0.8vw, 12px);
+}
+.stage.tokens .token {
+  font-size: clamp(24px, 3vw, 46px);
+  padding: clamp(10px, 1.4vh, 18px) clamp(14px, 1.4vw, 24px);
+  border-radius: 12px;
+}
+.stage.tokens .token .id { font-size: clamp(11px, 1vw, 17px); }
+.stage.tokens .btn.lg { font-size: clamp(19px, 2.1vw, 32px); padding: clamp(14px, 1.8vh, 22px) clamp(28px, 3vw, 48px); }
+
 /* ---------------- Marp のページ ---------------- */
 /* フロントマターの style: を当てる器。中身のセレクタ（section.title など）が効くよう
    本文は section で包む。@scope で囲うので、ここの外へ漏れることはない */
