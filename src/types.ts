@@ -352,6 +352,10 @@ export interface DisplayInfo {
 /** 進行画面 → コントローラ に配信する再生状態 */
 export interface PlaybackState {
   scenarioName: string;
+  /** 表示中のシナリオ。コントローラから切り替えられる */
+  scenarioId: string;
+  /** 切り替え先の候補（コントローラに一覧を出すため） */
+  scenarios: Array<{ id: string; name: string }>;
   index: number;
   total: number;
   steps: Array<{ id: string; name: string; type: ContentType; note?: string }>;
@@ -372,6 +376,8 @@ export type PlaybackCommand =
   | { type: 'advance' }
   | { type: 'back' }
   | { type: 'goto'; index: number }
+  /** 別のシナリオへ移る（待機画面から本編に入るときなど） */
+  | { type: 'scenario'; id: string }
   | { type: 'restart' }
   /** 待機画面のオン/オフ（省略時はトグル） */
   | { type: 'standby'; on?: boolean }

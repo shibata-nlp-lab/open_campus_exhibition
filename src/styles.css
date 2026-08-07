@@ -445,3 +445,20 @@ table.data th { color: var(--fg-dim); font-weight: 600; font-size: 11px; }
 .stage.predict { overflow: hidden; }
 .stage.predict .generated { max-height: 32vh; overflow-y: auto; }
 .stage.predict .cand-list { max-height: 44vh; overflow-y: auto; }
+
+/* ---------------- 体験の入力画面：画面をいっぱいに使う ---------------- */
+.stage.entry {
+  gap: clamp(20px, 3.2vh, 44px);
+  padding: 4vh 4vw;
+}
+.stage.entry h1 { font-size: clamp(34px, 5.2vw, 76px); }
+.stage.entry p.lead { font-size: clamp(18px, 2.1vw, 32px); }
+.stage.entry .big-input {
+  width: min(1500px, 94vw);
+  font-size: clamp(22px, 2.8vw, 44px);
+  padding: clamp(18px, 2.6vh, 34px) clamp(22px, 2.4vw, 36px);
+  border-radius: 18px;
+}
+/* 入力例のボタンも相応に大きく */
+.stage.entry .btn.sm { font-size: clamp(13px, 1.3vw, 20px); padding: 6px 14px; border-radius: 999px; }
+.stage.entry .btn.lg { font-size: clamp(19px, 2.1vw, 32px); padding: clamp(14px, 1.8vh, 22px) clamp(28px, 3vw, 48px); }

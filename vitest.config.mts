@@ -12,5 +12,8 @@ export default defineConfig({
   test: {
     include: ['test/**/*.test.ts'],
     environment: 'node',
+    // llm-jp の語彙ファイル（6MB の JSON）の読み込みが最初の1件に乗るため、
+    // 既定の 5 秒だとマシンの状態によって落ちる。判定を緩めるのではなく待ち時間だけ延ばす。
+    testTimeout: 30000,
   },
 });

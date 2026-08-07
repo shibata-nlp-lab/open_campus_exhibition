@@ -212,7 +212,7 @@ function createControllerWindow(scenarioId: string) {
   });
 }
 
-function createPlayerWindow(scenarioId: string) {
+function createPlayerWindow(scenarioId: string, standby = false) {
   const cfg = loadConfig();
   if (playerWindow && !playerWindow.isDestroyed()) {
     playerWindow.focus();
@@ -233,7 +233,9 @@ function createPlayerWindow(scenarioId: string) {
     show: false,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), sandbox: false },
   });
-  playerWindow.loadURL(rendererUrl(`/player?scenario=${encodeURIComponent(scenarioId)}`));
+  playerWindow.loadURL(
+    rendererUrl(`/player?scenario=${encodeURIComponent(scenarioId)}${standby ? '&standby=1' : ''}`)
+  );
 
   playerWindow.once('ready-to-show', () => {
     if (cfg.settings.fullscreen) {
@@ -436,7 +438,9 @@ function registerIpc() {
   );
 
   /* --- ウィンドウ / ディスプレイ --- */
-  ipcMain.handle('player:open', (_e, scenarioId: string) => createPlayerWindow(scenarioId));
+  ipcMain.handle('player:open', (_e, args: { scenarioId: string; standby?: boolean }) =>
+    createPlayerWindow(args.scenarioId, args.standby)
+  );
   ipcMain.handle('player:close', () => {
     playerWindow?.close();
     playerWindow = null;

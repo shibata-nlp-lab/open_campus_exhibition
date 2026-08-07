@@ -82,7 +82,9 @@ const api = {
       unwrap(ipcRenderer.invoke('llmjp:embed', { groups, size })),
   },
   player: {
-    open: (scenarioId: string) => ipcRenderer.invoke('player:open', scenarioId),
+    /** standby: true で待機画面を出した状態から始める（本編はコントローラから選ぶ） */
+    open: (scenarioId: string, opts?: { standby?: boolean }) =>
+      ipcRenderer.invoke('player:open', { scenarioId, standby: Boolean(opts?.standby) }),
     close: () => ipcRenderer.invoke('player:close'),
     /** 自分のウィンドウの全画面切替（進行画面から使う） */
     toggleFullscreen: () => ipcRenderer.invoke('window:toggleFullscreen'),
