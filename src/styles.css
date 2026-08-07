@@ -445,3 +445,38 @@ table.data th { color: var(--fg-dim); font-weight: 600; font-size: 11px; }
 .stage.predict { overflow: hidden; }
 .stage.predict .generated { max-height: 32vh; overflow-y: auto; }
 .stage.predict .cand-list { max-height: 44vh; overflow-y: auto; }
+
+/* ---------------- 体験の入力画面：画面をいっぱいに使う ---------------- */
+.stage.entry {
+  gap: clamp(20px, 3.2vh, 44px);
+  padding: 4vh 4vw;
+}
+.stage.entry h1 { font-size: clamp(34px, 5.2vw, 76px); }
+.stage.entry p.lead { font-size: clamp(18px, 2.1vw, 32px); }
+.stage.entry .big-input {
+  width: min(1500px, 94vw);
+  font-size: clamp(22px, 2.8vw, 44px);
+  padding: clamp(18px, 2.6vh, 34px) clamp(22px, 2.4vw, 36px);
+  border-radius: 18px;
+}
+/* 入力例のボタンも相応に大きく */
+.stage.entry .btn.sm { font-size: clamp(13px, 1.3vw, 20px); padding: 6px 14px; border-radius: 999px; }
+.stage.entry .btn.lg { font-size: clamp(19px, 2.1vw, 32px); padding: clamp(14px, 1.8vh, 22px) clamp(28px, 3vw, 48px); }
+
+/* ---------------- Marp のページ ---------------- */
+/* フロントマターの style: を当てる器。中身のセレクタ（section.title など）が効くよう
+   本文は section で包む。@scope で囲うので、ここの外へ漏れることはない */
+.slide-md.marp-scope { position: relative; }
+/* :where() で詳細度を 0 にしてあるので、スライド側が書いた `section { … }` が素直に勝つ。
+   min-height はページいっぱいの箱を作るため（Marp と同じく flex で上下中央寄せができる） */
+.slide-md > :where(section) { display: block; min-height: 100%; }
+.marp-page-number {
+  position: absolute; right: 2.4vw; bottom: 2.4vh;
+  font-size: 14px; color: #8a97ab;
+}
+
+/* ---------------- Marp Core で描くスライド ---------------- */
+/* Marp のテーマは svg を 100vw × 100vh にするが、ここは画面全体ではないので上書きする */
+.slide-marp { flex: 1; min-height: 0; display: grid; place-items: center; background: #0a0f1a; }
+.slide-marp .marpit { width: 100%; height: 100%; display: grid; place-items: center; }
+.slide-marp div.marpit > svg[data-marpit-svg] { width: 100%; height: 100%; }

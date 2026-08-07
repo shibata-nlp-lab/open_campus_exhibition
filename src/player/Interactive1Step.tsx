@@ -252,8 +252,8 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
   /* ---------- 入力 ---------- */
   if (phase === 'input') {
     return (
-      <div className="stage">
-        <span className="chip">体験①</span>
+      <div className="stage entry">
+        <span className="chip lg">体験①</span>
         <h1>{content.prompt}</h1>
         <p className="lead">入力した文が、AIの中でどう「数字」に変わるのか見てみよう。</p>
         <input
@@ -282,7 +282,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
   if (phase === 'tokens') {
     return (
       <div className="stage fade-in">
-        <span className="chip">STEP 1 — 単語分割</span>
+        <span className="chip lg">STEP 1 — 単語分割</span>
         <h2>文章は「単語」の小さなかたまりに分けられる</h2>
         <div className="token-line">
           {tokens.map((t, i) => (
@@ -311,7 +311,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
 
   return (
     <div className="stage scroll fade-in" style={{ gap: 14 }}>
-      <span className="chip">STEP 2 — ベクトル化（埋め込み）</span>
+      <span className="chip lg">STEP 2 — ベクトル化（埋め込み）</span>
       <h2>単語は「意味を表す数字の列」になる</h2>
 
       {busy && <div className="spin" />}

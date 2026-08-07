@@ -132,6 +132,20 @@ export default function ScenarioPanel({ config, update, flush }: Props) {
               </button>
               <button
                 className="btn"
+                title="待機画面を出した状態で開きます。本編への切り替えはコントローラから行います"
+                onClick={async () => {
+                  update((d) => {
+                    d.activeScenarioId = scenario.id;
+                    return d;
+                  });
+                  await flush();
+                  await api.player.open(scenario.id, { standby: true });
+                }}
+              >
+                ⏸ 待機画面で開始
+              </button>
+              <button
+                className="btn"
                 onClick={() =>
                   update((d) => {
                     d.activeScenarioId = scenario.id;

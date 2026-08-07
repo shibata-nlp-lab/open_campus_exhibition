@@ -23,12 +23,21 @@ export interface StepProps<T extends Content = Content> {
   runKey: number;
 }
 
-export default function PlayerApp({ scenarioId }: { scenarioId: string | null }) {
+export default function PlayerApp({
+  scenarioId,
+  startStandby = false,
+}: {
+  scenarioId: string | null;
+  /** 待機画面を出した状態で始める（本編はコントローラから選ぶ） */
+  startStandby?: boolean;
+}) {
   const [config, setConfig] = useState<AppConfig | null>(null);
+  /** 表示中のシナリオ。コントローラから切り替えられるので state で持つ */
+  const [currentId, setCurrentId] = useState<string | null>(scenarioId);
   const [index, setIndex] = useState(0);
   const [runKey, setRunKey] = useState(0);
   const [detail, setDetail] = useState<string | null>(null);
-  const [standby, setStandby] = useState(false);
+  const [standby, setStandby] = useState(startStandby);
   const [standbyMuted, setStandbyMuted] = useState(false);
   /** コントローラ画面が開いているか。開いていれば来場者側に操作ボタンは出さない */
   const [hasController, setHasController] = useState(false);
@@ -46,12 +55,12 @@ export default function PlayerApp({ scenarioId }: { scenarioId: string | null })
   const scenario = useMemo(() => {
     if (!config) return null;
     return (
-      config.scenarios.find((s) => s.id === scenarioId) ??
+      config.scenarios.find((s) => s.id === currentId) ??
       config.scenarios.find((s) => s.id === config.activeScenarioId) ??
       config.scenarios[0] ??
       null
     );
-  }, [config, scenarioId]);
+  }, [config, currentId]);
 
   const steps = useMemo(() => {
     if (!config || !scenario) return [] as Content[];
@@ -107,6 +116,14 @@ export default function PlayerApp({ scenarioId }: { scenarioId: string | null })
       if (cmd.type === 'next') next();
       else if (cmd.type === 'prev') prev();
       else if (cmd.type === 'goto') goto(cmd.index);
+      else if (cmd.type === 'scenario') {
+        // 待機画面から本編へ入る導線。最初から始めて待機は解除する
+        setCurrentId(cmd.id);
+        setIndex(0);
+        setRunKey((k) => k + 1);
+        setDetail(null);
+        setStandby(false);
+      }
       else if (cmd.type === 'restart') restart();
       else if (cmd.type === 'standby') setStandby((v) => cmd.on ?? !v);
       else if (cmd.type === 'standbyMute') setStandbyMuted((v) => cmd.muted ?? !v);
@@ -154,9 +171,11 @@ export default function PlayerApp({ scenarioId }: { scenarioId: string | null })
   /* コントローラへ状態を配信 */
   const publishedRef = useRef('');
   useEffect(() => {
-    if (!scenario) return;
+    if (!scenario || !config) return;
     const state = {
       scenarioName: scenario.name,
+      scenarioId: scenario.id,
+      scenarios: config.scenarios.map((s) => ({ id: s.id, name: s.name })),
       index,
       total: steps.length,
       // メモは進行画面（来場者側）には出さず、コントローラにだけ送る
@@ -174,7 +193,7 @@ export default function PlayerApp({ scenarioId }: { scenarioId: string | null })
     if (json === publishedRef.current) return;
     publishedRef.current = json;
     api.playback.publish(state);
-  }, [scenario, index, steps, detail, standby, standbyAudioAvailable, standbyMuted, effectiveStandby]);
+  }, [config, scenario, index, steps, detail, standby, standbyAudioAvailable, standbyMuted, effectiveStandby]);
 
   if (!config) return <div className="player" />;
 
@@ -220,7 +239,13 @@ export default function PlayerApp({ scenarioId }: { scenarioId: string | null })
       case 'game': return <GameStep {...(stepProps as StepProps<typeof content>)} />;
       case 'survey': return <SurveyStep {...(stepProps as StepProps<typeof content>)} />;
       case 'standby':
-        return <StandbyStep {...(stepProps as StepProps<typeof content>)} standbyMuted={standbyMuted} />;
+        return (
+          <StandbyStep
+            {...(stepProps as StepProps<typeof content>)}
+            standbyMuted={standbyMuted}
+            hideActions={hasController}
+          />
+        );
     }
   })();
 
@@ -230,7 +255,13 @@ export default function PlayerApp({ scenarioId }: { scenarioId: string | null })
         {body}
       </div>
       {standby && content.type !== 'standby' && (
-        <StandbyView content={overlayStandby} overlay muted={standbyMuted} onFinish={() => setStandby(false)} />
+        <StandbyView
+          content={overlayStandby}
+          overlay
+          muted={standbyMuted}
+          hideActions={hasController}
+          onFinish={() => setStandby(false)}
+        />
       )}
       <div className="player-bar">
         <span className="title">{config.settings.exhibitTitle}</span>

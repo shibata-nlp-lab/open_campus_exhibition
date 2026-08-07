@@ -97,8 +97,8 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
 
   if (!started) {
     return (
-      <div className="stage">
-        <span className="chip">体験②</span>
+      <div className="stage entry">
+        <span className="chip lg">体験②</span>
         <h1>{content.prompt}</h1>
         <p className="lead">AIは「次に来ることば」を確率で予想しています。実際にやらせてみよう。</p>
         <input

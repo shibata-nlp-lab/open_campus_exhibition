@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveRelativeAssets, splitMarkdown } from '../src/lib/markdown';
+import { parseMarp, resolveRelativeAssets, splitMarkdown } from '../src/lib/markdown';
 
 describe('splitMarkdown', () => {
   it('--- でページに分ける', () => {
@@ -62,5 +62,51 @@ describe('resolveRelativeAssets', () => {
   it('日本語のファイル名でも壊れない', () => {
     const html = '<img src="画像/猫.png">';
     expect(resolveRelativeAssets(html, '/base', toUrl)).toBe(`<img src="${toUrl('/base/画像/猫.png')}">`);
+  });
+});
+
+describe('先頭の --- の扱い', () => {
+  // `key: value` を含まない `---` ブロックをフロントマターとして食べてしまうと、
+  // 次の `---` までが丸ごと消えてスライドが真っ白になる
+  it('ページ区切りのつもりの --- で本文が消えない', () => {
+    const src = '---\n\n<!-- _class: center -->\n\n# ご覧いただきありがとうございました\n\n---\n';
+    const doc = parseMarp(src);
+    expect(doc.pages).toHaveLength(1);
+    expect(doc.pages[0].markdown).toContain('ご覧いただきありがとうございました');
+    expect(doc.pages[0].classes).toEqual(['center']);
+  });
+
+  it('本物のフロントマターはこれまでどおり取り除く', () => {
+    const doc = parseMarp('---\nmarp: true\npaginate: true\n---\n\n# A\n\n---\n\n# B\n');
+    expect(doc.pages.map((p) => p.markdown)).toEqual(['# A', '# B']);
+    expect(doc.pages[0].paginate).toBe(true);
+  });
+});
+
+describe('<style> の取り出し', () => {
+  it('scoped はそのページだけ、本文からは消える', () => {
+    const src = '# A\n\n<style scoped>\nsection { display: flex; }\n</style>\n\n---\n\n# B\n';
+    const doc = parseMarp(src);
+    expect(doc.pages[0].markdown).toBe('# A');
+    expect(doc.pages[0].style).toBe('section { display: flex; }');
+    expect(doc.pages[1].style).toBe('');
+    expect(doc.style).toBe('');
+  });
+
+  it('scoped でない <style> はスライド全体に効く', () => {
+    const doc = parseMarp('# A\n\n---\n\n# B\n\n<style>\nh1 { color: red; }\n</style>\n');
+    expect(doc.style).toBe('h1 { color: red; }');
+    expect(doc.pages.map((p) => p.markdown)).toEqual(['# A', '# B']);
+  });
+
+  it('フロントマターの style: と <style> は両方効く', () => {
+    const doc = parseMarp('---\nstyle: |\n  h1 { color: blue; }\n---\n\n# A\n\n<style>\nh2 { color: red; }\n</style>\n');
+    expect(doc.style).toBe('h1 { color: blue; }\nh2 { color: red; }');
+  });
+
+  it('<style> だけのページは増えないが CSS は拾う', () => {
+    const doc = parseMarp('# A\n\n---\n\n<style>\nh1 { color: red; }\n</style>\n');
+    expect(doc.pages).toHaveLength(1);
+    expect(doc.style).toBe('h1 { color: red; }');
   });
 });

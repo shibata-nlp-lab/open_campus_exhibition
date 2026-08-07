@@ -20,7 +20,16 @@ type Patch<T> = (fn: (c: T) => void) => void;
 
 /* ---------------- 共通：音声設定 ---------------- */
 
-function AudioFields({ audio, patch }: { audio: AudioSetting; patch: (fn: (a: AudioSetting) => void) => void }) {
+function AudioFields({
+  audio,
+  patch,
+  alwaysLoop = false,
+}: {
+  audio: AudioSetting;
+  patch: (fn: (a: AudioSetting) => void) => void;
+  /** 待機画面のように必ずループさせるものは、トグルを出さず説明だけにする */
+  alwaysLoop?: boolean;
+}) {
   return (
     <div className="card" style={{ marginBottom: 14 }}>
       <div className="small muted" style={{ marginBottom: 8 }}>この最中に流す音声</div>
@@ -43,7 +52,11 @@ function AudioFields({ audio, patch }: { audio: AudioSetting; patch: (fn: (a: Au
             />
           </Field>
         </div>
-        <Toggle label="ループ再生" checked={audio.loop} onChange={(v) => patch((a) => void (a.loop = v))} />
+        {alwaysLoop ? (
+          <span className="small muted" style={{ whiteSpace: 'nowrap' }}>ループ再生（常にオン）</span>
+        ) : (
+          <Toggle label="ループ再生" checked={audio.loop} onChange={(v) => patch((a) => void (a.loop = v))} />
+        )}
       </div>
     </div>
   );
@@ -971,9 +984,10 @@ function StandbyEditor({ c, patch }: { c: StandbyContent; patch: Patch<StandbyCo
         suffix="秒（0 で手動のみ。1以上でカウントダウン表示）"
         max={3600}
       />
-      <AudioFields audio={c.audio} patch={(fn) => patch((x) => fn(x.audio))} />
+      <AudioFields audio={c.audio} patch={(fn) => patch((x) => fn(x.audio))} alwaysLoop />
       <div className="small muted">
-        ※ BGM は待機画面を出している間だけ鳴り、次へ進むと止まります。
+        ※ BGM は待機画面を出している間だけ鳴り、次へ進むと止まります。<strong>最後まで再生したら先頭に戻ります</strong>
+        （途中で無音になると「終わった」ように見えるため、待機画面では常にループします）。
         進行中のオン／オフはコントローラ画面から操作します（来場者側の画面にはボタンを出しません）。
       </div>
     </>

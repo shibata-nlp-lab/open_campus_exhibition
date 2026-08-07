@@ -117,6 +117,7 @@ export function migrate(config: AppConfig): AppConfig {
   if (!Array.isArray(config.settings.attributeOptions) || config.settings.attributeOptions.length === 0) {
     config.settings.attributeOptions = DEFAULT_ATTRIBUTE_OPTIONS.slice();
   }
+  if (!Array.isArray(config.settings.marpThemes)) config.settings.marpThemes = [];
 
   // 同梱サンプルが更新されていたら取り込む
   if ((config.samplesVersion ?? 0) < SAMPLES_VERSION) {

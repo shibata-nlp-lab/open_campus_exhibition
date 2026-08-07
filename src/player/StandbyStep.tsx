@@ -10,14 +10,18 @@ export function StandbyView({
   onFinish,
   overlay = false,
   muted = false,
+  hideActions = false,
 }: {
   content: StandbyContent;
   onFinish: () => void;
   overlay?: boolean;
   /** BGM のミュート状態（コントローラ側から制御する） */
   muted?: boolean;
+  /** 来場者に見せる画面では操作ボタンを出さない（コントローラで操作するため） */
+  hideActions?: boolean;
 }) {
-  useAudio(content.audio, muted);
+  // 待機画面の BGM は必ずループさせる。途中で切れて無音になると「終わった」ように見える
+  useAudio({ ...content.audio, loop: true }, muted);
   const [now, setNow] = useState(new Date());
   const [left, setLeft] = useState(content.autoAdvanceSec);
 
@@ -80,11 +84,13 @@ export function StandbyView({
         <div className="standby-count small muted">あと {left} 秒ではじまります</div>
       )}
 
-      <div className="standby-actions">
-        <button className="btn primary lg" onClick={onFinish}>
-          {overlay ? '再開する ▶' : 'はじめる ▶'}
-        </button>
-      </div>
+      {!hideActions && (
+        <div className="standby-actions">
+          <button className="btn primary lg" onClick={onFinish}>
+            {overlay ? '再開する ▶' : 'はじめる ▶'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -93,6 +99,7 @@ export default function StandbyStep({
   content,
   onFinish,
   standbyMuted,
-}: StepProps<StandbyContent> & { standbyMuted?: boolean }) {
-  return <StandbyView content={content} onFinish={onFinish} muted={standbyMuted} />;
+  hideActions,
+}: StepProps<StandbyContent> & { standbyMuted?: boolean; hideActions?: boolean }) {
+  return <StandbyView content={content} onFinish={onFinish} muted={standbyMuted} hideActions={hideActions} />;
 }

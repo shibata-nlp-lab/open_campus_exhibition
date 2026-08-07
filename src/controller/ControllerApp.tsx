@@ -170,8 +170,31 @@ export default function ControllerApp() {
 
       <AttributePanel config={config} state={state} />
 
+      {(state.scenarios?.length ?? 0) > 1 && (
+        <section>
+          <div className="ctrl-label">シナリオを切り替える（最初から始まります）</div>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            {state.scenarios.map((s) => (
+              <button
+                key={s.id}
+                className={`btn ${s.id === state.scenarioId ? 'primary' : ''}`}
+                onClick={() => api.playback.send({ type: 'scenario', id: s.id })}
+              >
+                {s.id === state.scenarioId ? '● ' : '▶ '}
+                {s.name}
+              </button>
+            ))}
+          </div>
+          {state.standby && (
+            <div className="small muted" style={{ marginTop: 6 }}>
+              待機画面を出したままでも、ここから選べば本編に切り替わります。
+            </div>
+          )}
+        </section>
+      )}
+
       <section>
-        <div className="ctrl-label">シナリオ（クリックで移動）</div>
+        <div className="ctrl-label">今のシナリオの中を移動</div>
         <div className="col" style={{ gap: 5 }}>
           {state.steps.map((s, i) => (
             <button

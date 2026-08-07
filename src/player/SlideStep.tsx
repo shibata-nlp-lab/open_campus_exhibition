@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { marked } from 'marked';
 import type { SlideContent } from '../types';
 import type { StepProps } from './PlayerApp';
 import { api, errText } from '../lib/api';
 import { useAudio, useStepKeys } from './useAudio';
 import { DEFAULT_INTRO_MARKDOWN } from '../defaults';
-import { resolveRelativeAssets, splitMarkdown } from '../lib/markdown';
+import { parseMarp, resolveRelativeAssets } from '../lib/markdown';
+import { isMarpDocument, renderMarp } from '../lib/marp';
 
 /** 相対パスの画像を ocfile:// に置き換える（変換関数だけ渡して純粋な処理は lib 側に置いてある） */
 const withAssets = (html: string, baseDir: string | null) =>
@@ -26,8 +27,10 @@ function MarkdownSlides({
   baseDir: string | null;
   onPage?: (page: number, total: number) => void;
 }) {
-  const pages = splitMarkdown(src);
+  const doc = useMemo(() => parseMarp(src), [src]);
+  const pages = doc.pages;
   const [page, setPage] = useState(0);
+  const current = pages[Math.min(page, pages.length - 1)];
 
   useEffect(() => {
     onPage?.(page + 1, pages.length);
@@ -46,13 +49,98 @@ function MarkdownSlides({
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div
-        className="slide-md fade-in"
+        className="slide-md marp-scope fade-in"
         key={page}
-        dangerouslySetInnerHTML={{
-          __html: withAssets(marked.parse(pages[page]) as string, baseDir),
-        }}
-      />
+        style={{ background: current.backgroundColor, color: current.color }}
+      >
+        {/* style: と <style>。@scope で囲って、アプリ側の画面に漏れないようにする */}
+        {doc.style && <style>{`@scope (.marp-scope) {\n${doc.style}\n}`}</style>}
+        {/* <style scoped> はこのページの分だけ（key={page} で貼り替わる） */}
+        {current.style && <style>{`@scope (.marp-scope) {\n${current.style}\n}`}</style>}
+        <section
+          className={current.classes.join(' ')}
+          dangerouslySetInnerHTML={{ __html: withAssets(marked.parse(current.markdown) as string, baseDir) }}
+        />
+        {current.paginate && <span className="marp-page-number">{page + 1}</span>}
+      </div>
       <SlideBar page={page} total={pages.length} onPrev={prev} onNext={next} />
+    </div>
+  );
+}
+
+/**
+ * `marp: true` の Markdown を Marp Core で描く。
+ * テーマ CSS（default / gaia / uncover と自作テーマ）がそのまま効く。
+ */
+function MarpSlides({
+  src,
+  themes,
+  onEnd,
+  onBack,
+  autoSec,
+  baseDir,
+  onPage,
+}: {
+  src: string;
+  themes: string[];
+  onEnd: () => void;
+  onBack: () => void;
+  autoSec: number;
+  baseDir: string | null;
+  onPage?: (page: number, total: number) => void;
+}) {
+  const [doc, setDoc] = useState<{ slides: string[]; css: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    renderMarp(src, themes)
+      .then((r) => !cancelled && setDoc(r))
+      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : String(e)));
+    return () => {
+      cancelled = true;
+    };
+  }, [src, themes]);
+
+  const total = doc?.slides.length ?? 0;
+  const next = () => (page + 1 < total ? setPage(page + 1) : onEnd());
+  const prev = () => (page > 0 ? setPage(page - 1) : onBack());
+  useStepKeys({ next, prev, enabled: total > 0 });
+
+  useEffect(() => {
+    if (total) onPage?.(page + 1, total);
+  }, [page, total]);
+
+  useEffect(() => {
+    if (!autoSec || !total) return;
+    const t = window.setTimeout(next, autoSec * 1000);
+    return () => window.clearTimeout(t);
+  }, [page, autoSec, total]);
+
+  if (error) {
+    return (
+      <div className="stage">
+        <h2>スライドを描画できませんでした</h2>
+        <p className="lead small mono">{error}</p>
+        <button className="btn lg primary" onClick={onEnd}>次へ</button>
+      </div>
+    );
+  }
+  if (!doc) return <div className="stage"><div className="spin" /></div>;
+
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div className="slide-marp">
+        <style>{doc.css}</style>
+        <div
+          className="marpit"
+          key={page}
+          dangerouslySetInnerHTML={{ __html: withAssets(doc.slides[Math.min(page, total - 1)] ?? '', baseDir) }}
+        />
+      </div>
+      <SlideBar page={page} total={total} onPrev={prev} onNext={next} />
     </div>
   );
 }
@@ -168,10 +256,28 @@ function SlideBar({ page, total, onPrev, onNext }: { page: number; total: number
   );
 }
 
-export default function SlideStep({ content, onFinish, onDetail }: StepProps<SlideContent>) {
+export default function SlideStep({ content, config, onFinish, onDetail }: StepProps<SlideContent>) {
   const audio = useAudio(content.audio);
   const [mdText, setMdText] = useState<string | null>(null);
   const [mdError, setMdError] = useState<string | null>(null);
+  /** 設定画面で登録した自作テーマ CSS の中身 */
+  const [themes, setThemes] = useState<string[]>([]);
+
+  const themePaths = config.settings.marpThemes ?? [];
+  useEffect(() => {
+    if (themePaths.length === 0) {
+      setThemes([]);
+      return;
+    }
+    let cancelled = false;
+    // 読めないテーマがあっても他は使えるようにする
+    Promise.all(themePaths.map((p) => api.file.readText(p).catch(() => '')))
+      .then((list) => !cancelled && setThemes(list.filter(Boolean)))
+      .catch(() => !cancelled && setThemes([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [themePaths.join('\n')]);
 
   const external = content.markdownSource === 'file' ? content.externalPath : null;
   const baseDir = external ? external.slice(0, external.lastIndexOf('/')) : null;
@@ -212,6 +318,19 @@ export default function SlideStep({ content, onFinish, onDetail }: StepProps<Sli
       );
     } else if (mdText === null) {
       body = <div className="stage"><div className="spin" /></div>;
+    } else if (isMarpDocument(mdText)) {
+      // marp: true が付いているものだけ本家 Marp Core に通す（テーマ CSS が効く）
+      body = (
+        <MarpSlides
+          src={mdText}
+          themes={themes}
+          onEnd={onFinish}
+          onBack={back}
+          autoSec={content.autoAdvanceSec}
+          baseDir={baseDir}
+          onPage={(p, t) => onDetail?.(`${p} / ${t} ページ`)}
+        />
+      );
     } else {
       body = (
         <MarkdownSlides
