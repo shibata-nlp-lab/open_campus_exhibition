@@ -11,8 +11,10 @@ LLM が次の単語を決めるまでの過程を競馬に見立てて、上位3
 層の深さ              ──▶  走った距離（1層 = 100m）
 ```
 
-**その場で推論はしません。** Colab のノートブックで確率を計算して CSV にし、
+**その場で推論はしません。** ノートブックで確率を計算して CSV にし、
 アプリに取り込んでからオッズを調整する、という事前作成のワークフローです。
+ノートブックは**ローカルでも Colab でも動きます。GPU は要りません**
+（手順は [notebooks/README.md](../notebooks/README.md)）。
 
 ## 目次
 
@@ -69,14 +71,15 @@ JRA と同じく、頭数に応じて 1〜8 枠へ割り振ります（8 頭以�
 
 **1 層 = 100 m** とします。
 
-| モデル | 層数 | 距離 |
-| --- | --- | --- |
-| GPT-2 small | 12 | 1200 m |
-| llm-jp-3-150m | 12 | 1200 m |
-| llm-jp-3-1.8b | 24 | 2400 m |
-| Llama-3-8B | 32 | 3200 m |
+| モデル | 層数 | 距離 | メモリ(fp32) |
+| --- | --- | --- | --- |
+| llm-jp-3-150m（既定） | 12 | 1200 m | 約 0.7GB |
+| llm-jp-3-440m | 16 | 1600 m | 約 1.8GB |
+| llm-jp-3-1.8b | 24 | 2400 m | 約 7GB |
+| Llama-3-8B | 32 | 3200 m | 約 32GB |
 
 JRA の距離が 1000〜3600 m なので、この換算だとどのモデルでも実在しそうな距離に収まります。
+**既定は 150m** で、CPU でも 1 レース数秒です。
 層数はモデルによって違うので、**距離はレースごとに CSV から決まります**。
 
 ### 途中経過
@@ -225,7 +228,7 @@ CSV を書き出す前に、**縦軸 logit** と**縦軸 probability** の 2 枚
 ## 制作の流れ
 
 ```
-Colab（notebooks/next_word_race.ipynb）
+ノートブック（notebooks/next_word_race.ipynb、ローカル or Colab）
   プロンプトを並べる
       ↓ logit lens で各層の確率を計算
   順位変動グラフ（logit / probability）を目視で確認
@@ -296,7 +299,9 @@ interface BettingContent extends ContentBase {
 
 | ファイル | 役割 |
 | --- | --- |
-| [notebooks/next_word_race.ipynb](../notebooks/next_word_race.ipynb) | Colab。確率の計算・グラフ・CSV 出力 |
+| [notebooks/next_word_race.ipynb](../notebooks/next_word_race.ipynb) | 確率の計算・グラフ・CSV 出力（ローカル / Colab） |
+| [notebooks/README.md](../notebooks/README.md) | ノートブックの動かし方とつまずきどころ |
+| [notebooks/requirements.txt](../notebooks/requirements.txt) | ローカル実行用の依存 |
 | [src/lib/odds.ts](../src/lib/odds.ts) | 乱数、単勝オッズ生成、Harville、券種ごとのオッズ |
 | [src/lib/race.ts](../src/lib/race.ts) | 層の確率 → なめらかな位置。着順の確定 |
 | [src/lib/track.ts](../src/lib/track.ts) | オーバルコースの幾何。距離 → 座標と向き |

@@ -31,3 +31,7 @@ CLAUDE.md
 # ユーザーが用意するコンテンツ（音源・動画・スライドなど）。フォルダだけ残す
 contents/*
 !contents/.gitkeep
+
+# ノートブックのローカル環境と出力
+notebooks/venv/
+notebooks/races.csv

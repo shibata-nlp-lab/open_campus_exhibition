@@ -1,0 +1,13 @@
+# 馬券風モードのレースデータを作るノートブック用。
+# GPU は要りません（CPU で動く大きさのモデルを使います）。
+#
+# transformers 5 系は torch>=2.4 を要求します。macOS で torch が 2.2 までしか
+# 入らない環境があるため 4 系に留めています。torch 2.2 は numpy 2 系と
+# ABI が合わない（"compiled using NumPy 1.x cannot be run in NumPy 2.x"）ので
+# numpy も 1 系に固定します。
+torch>=2.2
+transformers>=4.44,<5
+numpy<2
+pandas>=2.0
+matplotlib>=3.7
+jupyterlab>=4.0
