@@ -233,7 +233,9 @@ table.data th { color: var(--fg-dim); font-weight: 600; font-size: 11px; }
 .neighbour b { font-size: 14px; color: var(--accent-2); font-weight: 600; }
 
 /* 意味の地図 */
-.map-wrap { width: min(1100px, 94vw); }
+/* 体験①のベクトル画面が1画面に収まるよう、地図は高さを抑える */
+.map-wrap { width: min(980px, 88vw); }
+.map-wrap .scatter { max-height: 38vh; }
 
 .scatter { background: #0a1020; border: 1px solid var(--line); border-radius: 14px; display: block; width: 100%; }
 
@@ -411,7 +413,8 @@ table.data th { color: var(--fg-dim); font-weight: 600; font-size: 11px; }
 .launcher h1 { margin: 0; }
 
 /* ---------------- 体験①：ベクトルの見出し ---------------- */
-.vec-caption { font-size: clamp(20px, 2.2vw, 32px); color: var(--fg-dim); }
+/* 見出し（h2）より一段下。強弱をつけるため意図的に小さくしている */
+.vec-caption { font-size: clamp(15px, 1.5vw, 21px); color: var(--fg-dim); }
 .vec-caption b { color: var(--fg); }
 
 /* ---------------- 体験②：画面全体を使う ---------------- */
