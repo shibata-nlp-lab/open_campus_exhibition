@@ -254,8 +254,9 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
     return (
       <div className="stage entry">
         <span className="chip lg">体験①</span>
-        <h1>{content.prompt}</h1>
-        <p className="lead">入力した文が、AIの中でどう「数字」に変わるのか見てみよう。</p>
+        {/* 一番言いたいのは「何が起きるか」なので、そちらを見出しに。入力のお願いはその下 */}
+        <h1>入力した文が、AIの中でどう「数字」に変わるのか見てみよう。</h1>
+        <p className="lead">{content.prompt}</p>
         <input
           className="big-input"
           autoFocus
@@ -311,7 +312,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
 
   return (
     <div className="stage scroll fade-in" style={{ gap: 14 }}>
-      <span className="chip lg">STEP 2 — ベクトル化（埋め込み）</span>
+      <span className="chip lg">STEP 2 — ベクトル化</span>
       <h2>単語は「意味を表す数字の列」になる</h2>
 
       {busy && <div className="spin" />}
@@ -368,7 +369,8 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
             {neighbours.map((n) => (
               <span key={n.word} className="neighbour">
                 {n.word}
-                <b>{(n.shown * 100).toFixed(0)}%</b>
+                {/* % だと「割合」に読めてしまうので、0〜1 の数値のまま出す */}
+                <b>{n.shown.toFixed(2)}</b>
               </span>
             ))}
           </div>
@@ -380,6 +382,8 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
           vocabPoints={projected?.vocab ?? []}
           vocabLabels={mapPool?.words ?? []}
           highlight={new Set(neighbours.map((n) => mapPool?.idx.indexOf(n.i) ?? -1).filter((i) => i >= 0))}
+          target={projected?.tokens[selected] ?? null}
+          targetLabel={selectedText}
         />
       </div>
 
@@ -398,15 +402,21 @@ function Scatter({
   vocabPoints,
   vocabLabels,
   highlight,
+  target,
+  targetLabel,
 }: {
   vocabPoints: Array<[number, number]>;
   vocabLabels: string[];
   highlight: Set<number>;
+  /** いま選んでいる単語。青い点で出す */
+  target?: [number, number] | null;
+  targetLabel?: string;
 }) {
   const W = 1000;
   const H = 440;
   const pad = 40;
-  const all = vocabPoints;
+  // 選んだ単語が端に来ても切れないよう、目盛りの範囲は語彙と一緒に決める
+  const all = target ? [...vocabPoints, target] : vocabPoints;
   if (all.length === 0) return <svg className="scatter" width="100%" viewBox={`0 0 ${W} ${H}`} />;
 
   const xs = all.map((p) => p[0]);
@@ -432,6 +442,29 @@ function Scatter({
           </g>
         );
       })}
+
+      {/* いま選んでいる単語。近いことば（緑）と見分けがつくよう青で、いちばん上に描く */}
+      {target && (
+        <g>
+          <circle cx={sx(target[0])} cy={sy(target[1])} r={11} fill="#5aa9ff" opacity={0.25} />
+          <circle cx={sx(target[0])} cy={sy(target[1])} r={6.5} fill="#5aa9ff" stroke="#fff" strokeWidth={2} />
+          {/* 近くに語が固まっても読めるよう、背景色で縁取りしてから塗る */}
+          {targetLabel && (
+            <text
+              x={sx(target[0]) + 14}
+              y={sy(target[1]) + 6}
+              fontSize={19}
+              fontWeight={700}
+              fill="#8cc6ff"
+              stroke="#0b1220"
+              strokeWidth={4}
+              paintOrder="stroke"
+            >
+              {targetLabel}
+            </text>
+          )}
+        </g>
+      )}
     </svg>
   );
 }
