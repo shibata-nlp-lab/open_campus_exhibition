@@ -520,7 +520,7 @@ function Interactive1Editor({ c, patch }: { c: Interactive1Content; patch: Patch
   return (
     <>
       <div className="banner warn" style={{ marginBottom: 14 }}>
-        入力文をトークンに分割（js-tiktoken / o200k_base）し、OpenAI Embeddings API でベクトル化して可視化します。
+        入力文をトークンに分割し、ベクトルにして可視化します。分割の流儀とベクトル化の取得元は下で選べます。
       </div>
       <Field label="来場者への問いかけ">
         <input className="input" value={c.prompt} onChange={(e) => patch((x) => void (x.prompt = e.target.value))} />
@@ -530,7 +530,20 @@ function Interactive1Editor({ c, patch }: { c: Interactive1Content; patch: Patch
       </Field>
       <ExamplesField examples={c.examples} onChange={(v) => patch((x) => void (x.examples = v))} />
 
-      <Field label="ベクトル化（埋め込み）の取得元">
+      <Field
+        label="ベクトル化（埋め込み）の取得元"
+        helpTone={(c.embeddingSource ?? 'openai') === 'ruri' ? 'ok' : 'warn'}
+        help={
+          (c.embeddingSource ?? 'openai') === 'ruri' ? (
+            <>
+              日本語に特化したモデルをこのPC内で動かします。APIキー不要・通信なしで、
+              3,800語のベクトル化も数秒で終わります（API経由より高速）。
+            </>
+          ) : (
+            <>多言語モデルなので日本語の精度はローカルの Ruri に劣る場合があります。APIキーと通信が必要です。</>
+          )
+        }
+      >
         <select
           className="select"
           value={c.embeddingSource ?? 'openai'}
@@ -542,23 +555,40 @@ function Interactive1Editor({ c, patch }: { c: Interactive1Content; patch: Patch
           <option value="ruri">ローカル日本語モデル Ruri v3（cl-nagoya）</option>
         </select>
       </Field>
-      {(c.embeddingSource ?? 'openai') === 'ruri' ? (
-        <>
-          <div className="banner ok" style={{ marginBottom: 14 }}>
-            日本語に特化したモデルをこのPC内で動かします。APIキー不要・通信なしで、
-            3,800語のベクトル化も数秒で終わります（API経由より高速）。
-          </div>
-          <RuriPicker c={c} patch={patch} />
-        </>
-      ) : (
-        <div className="banner warn" style={{ marginBottom: 14 }}>
-          多言語モデルなので日本語の精度はローカルの Ruri に劣る場合があります。APIキーと通信が必要です。
-        </div>
-      )}
+      {(c.embeddingSource ?? 'openai') === 'ruri' && <RuriPicker c={c} patch={patch} />}
 
       <Field
         label="入力文を分割するトークナイザ"
         hint="来場者の文をどのモデルの流儀でトークンに分けるかを選びます。"
+        helpTone={(c.tokenizerMode ?? 'gpt') === 'ruri' ? 'ok' : 'warn'}
+        help={
+          (c.tokenizerMode ?? 'gpt') === 'ruri' ? (
+            <>
+              Ruri v3 が内部で使っているトークナイザ（ModernBERT-Ja 経由の Sarashina2 由来）で分割します。
+              <br />
+              gpt / llm-jp を選んだ場合、画面に見せる区切りと、このあとベクトルにするときにモデルが使う区切りは
+              一致しません（llm-jp と Ruri は語彙の 42% しか重なりません）。
+              <span className="mono">[ドラゴン][ボール]</span> と見せて、Ruri は{' '}
+              <span className="mono">[ドラゴンボール]</span> と読む、といったズレが起きます。
+              ここを Ruri v3 にすると、見せている区切りとモデルの区切りが揃います。
+              <br />
+              初回だけトークナイザ（7MB弱）をダウンロードします。埋め込みを Ruri にしていない場合でも選べます。
+            </>
+          ) : (
+            <>
+              同じ文でも切れ方がまるで違います。
+              <br />
+              <span className="mono">GPT-4o : [大][規][模][言][語][モデル][は][次][の][単][語][を][予][測][する] → 15個</span>
+              <br />
+              <span className="mono">llm-jp : [大規模][言語][モデル][は][次][の][単語][を][予測][する] → 10個</span>
+              <br />
+              <span className="mono">Ruri v3 : [大規模][言語][モデル][は次の][単語][を予測する] → 6個</span>
+              <br />
+              英語圏で作られたモデルは日本語をほぼ1文字ずつに割るため、同じ内容でもトークン数が増えます
+              （＝処理も料金も不利）。llm-jp を選ぶと語彙ファイルの読み込みに初回だけ1〜2秒かかります。
+            </>
+          )
+        }
       >
         <select
           className="select"
@@ -567,22 +597,33 @@ function Interactive1Editor({ c, patch }: { c: Interactive1Content; patch: Patch
         >
           <option value="gpt">GPT-4o（o200k_base）</option>
           <option value="llmjp">llm-jp（日本語LLM）</option>
+          <option value="ruri">Ruri v3</option>
         </select>
       </Field>
-      <div className="banner warn" style={{ marginBottom: 14 }}>
-        同じ文でも切れ方がまるで違います。
-        <br />
-        <span className="mono">GPT-4o : [大][規][模][言][語][モデル][は][次][の][単][語][を][予][測][する] → 15個</span>
-        <br />
-        <span className="mono">llm-jp : [大規模][言語][モデル][は][次][の][単語][を][予測][する] → 10個</span>
-        <br />
-        英語圏で作られたモデルは日本語をほぼ1文字ずつに割るため、同じ内容でもトークン数が増えます
-        （＝処理も料金も不利）。llm-jp を選ぶと語彙ファイルの読み込みに初回だけ1〜2秒かかります。
-      </div>
 
       <Field
         label="「意味が近いことば」を探す対象"
         hint="来場者がトークンを選んだとき、どの語の集まりの中から近いものを探すかを決めます。"
+        helpTone={(c.neighbourSource ?? 'curated') === 'tokenizer' ? 'warn' : 'ok'}
+        help={
+          (c.neighbourSource ?? 'curated') === 'tokenizer' ? (
+            <>
+              GPT-4o のトークナイザが実際に持つ語彙から探します。「かな を含む」または「常用漢字のみ（2文字以上）」で
+              抽出し、簡体字の中国語と賭博・アダルト系の語幹を除外して 1,842 語になっています。
+              <br />
+              ただし <span className="mono">天天</span> <span className="mono">提款</span>{' '}
+              のような中国語や、<span className="mono">風吹けば名無し</span>{' '}
+              のような5ch由来の語は残ります（それがトークナイザの実態です）。来場者に見せる前に一度ご自身で試してください。
+              <br />
+              初回だけ埋め込み取得に数秒かかります（結果はディスクに保存され、次回以降は不要）。
+            </>
+          ) : (
+            <>
+              読みやすく安全な結果になります（猫 → 犬・馬・魚・鳥）。語彙は
+              <span className="mono">src/content/vocabulary.ts</span> で編集できます。
+            </>
+          )
+        }
       >
         <select
           className="select"
@@ -594,23 +635,6 @@ function Interactive1Editor({ c, patch }: { c: Interactive1Content; patch: Patch
           <option value="llmjp">llm-jp から抽出した日本語（数万語）</option>
         </select>
       </Field>
-      {(c.neighbourSource ?? 'curated') === 'tokenizer' ? (
-        <div className="banner warn" style={{ marginBottom: 14 }}>
-          GPT-4o のトークナイザが実際に持つ語彙から探します。「かな を含む」または「常用漢字のみ（2文字以上）」で
-          抽出し、簡体字の中国語と賭博・アダルト系の語幹を除外して 1,842 語になっています。
-          <br />
-          ただし <span className="mono">天天</span> <span className="mono">提款</span>{' '}
-          のような中国語や、<span className="mono">風吹けば名無し</span>{' '}
-          のような5ch由来の語は残ります（それがトークナイザの実態です）。来場者に見せる前に一度ご自身で試してください。
-          <br />
-          初回だけ埋め込み取得に数秒かかります（結果はディスクに保存され、次回以降は不要）。
-        </div>
-      ) : (
-        <div className="banner ok" style={{ marginBottom: 14 }}>
-          読みやすく安全な結果になります（猫 → 犬・馬・魚・鳥）。語彙は
-          <span className="mono">src/content/vocabulary.ts</span> で編集できます。
-        </div>
-      )}
     </>
   );
 }

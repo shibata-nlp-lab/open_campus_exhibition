@@ -96,8 +96,10 @@ export type NeighbourSource = 'curated' | 'tokenizer' | 'llmjp';
  * 入力文をどのトークナイザで分割するか。
  * - gpt:   o200k_base（GPT-4o の実物。日本語はほぼ1文字ずつに切れる）
  * - llmjp: llm-jp の SentencePiece Unigram（日本語向けなので単語単位で切れる）
+ * - ruri:  Ruri v3 が実際に使うトークナイザ（ModernBERT-Ja 経由の Sarashina2 由来）。
+ *          埋め込みも Ruri にしておくと、画面に見せる分割とモデル内部の分割が一致する。
  */
-export type TokenizerMode = 'gpt' | 'llmjp';
+export type TokenizerMode = 'gpt' | 'llmjp' | 'ruri';
 
 /**
  * ベクトル化（埋め込み）の取得元。

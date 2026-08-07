@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { AppConfig } from '../types';
 
 export interface PanelProps {
@@ -6,12 +6,41 @@ export interface PanelProps {
   update: (fn: (draft: AppConfig) => AppConfig) => void;
 }
 
-export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
+export function Field({
+  label,
+  children,
+  hint,
+  help,
+  helpTone = 'warn',
+}: {
+  label: string;
+  children: ReactNode;
+  hint?: string;
+  /** 長い説明。ふだんは畳んでおき、ラベル横の ? を押したときだけ出す */
+  help?: ReactNode;
+  helpTone?: 'warn' | 'ok';
+}) {
+  const [openHelp, setOpenHelp] = useState(false);
   return (
     <div className="field">
-      <label>{label}</label>
+      <label>
+        {label}
+        {help && (
+          <button
+            type="button"
+            className="help-btn"
+            aria-expanded={openHelp}
+            aria-label={openHelp ? '説明を閉じる' : '説明を開く'}
+            title="説明"
+            onClick={() => setOpenHelp((v) => !v)}
+          >
+            ?
+          </button>
+        )}
+      </label>
       {children}
       {hint && <div className="small muted">{hint}</div>}
+      {help && openHelp && <div className={`banner ${helpTone}`}>{help}</div>}
     </div>
   );
 }
