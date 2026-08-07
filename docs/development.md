@@ -23,7 +23,9 @@ npm run dev
 | `npm run dev` | vite dev server + esbuild watch + Electron 自動再起動 |
 | `npm run build` | `dist/main`（esbuild）と `dist/renderer`（vite）を作る |
 | `npm start` | ビルドして Electron で起動 |
-| `npm run typecheck` | `tsc --noEmit`。**テストが無いのでこれが最後の砦です** |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm test` | Vitest（1回だけ実行）。CI でも走ります |
+| `npm run test:watch` | 変更を監視して再実行 |
 | `npm run dist:mac` / `dist:win` | 配布ファイルを `release/` に作る |
 | `npm run fix-electron` | Electron バイナリを署名し直す |
 
@@ -55,11 +57,48 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 build.mjs が何もせず終了し、空の asar が梱包される**という事故がありました
 （[#2](https://github.com/shibata-nlp-lab/open_campus_exhibition/pull/2)）。
 
+## テスト
+
+Vitest。`test/` に置き、Node 環境で動かします（DOM も Electron も起動しません）。
+
+```bash
+npm test
+npm test -- test/config.migrate.test.ts   # 1ファイルだけ
+```
+
+**「壊れても人の目では気づけないもの」に絞ってあります。** 見た目や操作感は対象外です。
+
+| 対象 | なぜ守るか |
+| --- | --- |
+| `migrate()` | 既存ユーザーの config を起動時に書き換える。壊れると展示データが失われ、しかも新規インストールでは再現しない |
+| `tokenizeLlmJp()` | 自前 Viterbi。間違っていても「それっぽい分割」が出るので目視で気づけない |
+| IPC チャネル名 | preload と main の文字列の二重管理。typo は型で防げず、実行時に静かに失敗する |
+| `isJapaneseVocabToken()` | 緩むと来場者の画面に中国語スパムが出る |
+| `resultsToCsv()` | 引用符のエスケープはバグりやすい |
+
+`test/contract.ipc.test.ts` はコードを実行せず、`preload.ts` と `main.ts` を読んで
+チャネル名を突き合わせる静的なテストです。レンダラが `ipcRenderer` を直接使っていないことも
+ここで見ています。
+
+テストしやすくするために、純粋な処理は UI やファイル IO から切り出してあります
+（`src/lib/markdown.ts` `src/lib/time.ts` `electron/csv.ts` `electron/ruriTokens.ts`）。
+**新しく複雑な判断を書くときは、まず純粋関数として切り出せないか考えてください。**
+
+`electron/config.ts` は `app.getPath` を使うので、テスト側で `vi.mock('electron')` して
+一時ディレクトリに差し替えています。
+
+> Vitest は **3 系に固定**しています。4 系は vite 8（rolldown）を抱き込み、その optional peer
+> dependency である esbuild の扱いが npm のバージョンで変わるため、手元（npm 11）で作った
+> lock ファイルを CI（npm 10）の `npm ci` が「不足あり」と判断して落ちます。
+
+コンポーネントテスト（jsdom + Testing Library）はまだありません。追加するなら、
+集計に残る値（`record()` に渡す payload）から始めるのが費用対効果が高いはずです。
+
 ## CI / リリース
 
 | ワークフロー | 契機 | 内容 |
 | --- | --- | --- |
-| [ci.yml](../.github/workflows/ci.yml) | main への push / PR | 型チェック + ビルド（1〜2分） |
+| [ci.yml](../.github/workflows/ci.yml) | main への push / PR | 型チェック + テスト + ビルド（1〜2分） |
 | [release.yml](../.github/workflows/release.yml) | `v*` タグの push / 手動実行 | mac(arm64) と win(x64) を並列ビルド。タグなら Release に添付 |
 
 ```bash
@@ -126,4 +165,4 @@ CLAUDE.md にある方針に加えて、このリポジトリの実際の慣習�
   例外を投げて画面を白くするのは最後の手段です
 - **来場者に見せる情報と運営向けの情報を混ぜない。** 進行メモ・キー一覧・内部進捗は
   コントローラにだけ出します
-- テストは今のところありません。`npm run typecheck` と実機での確認が品質の担保です
+- **テストは「壊れても人の目では気づけないもの」に絞る。** 見た目は対象外です（下記）
