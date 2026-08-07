@@ -252,6 +252,8 @@ export interface AppSettings {
   showController: boolean;
   /** コントローラで来場者の属性を記録するときの区分 */
   attributeOptions: string[];
+  /** Marp の自作テーマ CSS（絶対パス）。`marp: true` のスライドで theme: に指定できる */
+  marpThemes: string[];
 }
 
 export interface AppConfig {

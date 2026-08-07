@@ -320,6 +320,7 @@ export function createDefaultConfig(): AppConfig {
       preferExternalDisplay: true,
       showController: true,
       attributeOptions: DEFAULT_ATTRIBUTE_OPTIONS.slice(),
+      marpThemes: [],
     },
     contents,
     scenarios: [full, short],

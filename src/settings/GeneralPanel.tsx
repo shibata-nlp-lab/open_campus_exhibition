@@ -142,6 +142,51 @@ export default function GeneralPanel({ config, update }: PanelProps) {
         </button>
       </div>
 
+      <div className="card" style={{ marginTop: 18 }}>
+        <div className="small muted" style={{ marginBottom: 10 }}>Marp の自作テーマ（CSS）</div>
+        <div className="small muted" style={{ marginBottom: 10 }}>
+          <span className="mono">/* @theme 名前 */</span> で始まる CSS を登録すると、スライドの
+          <span className="mono"> theme: 名前 </span>で使えます。
+          <strong>ファイルは参照するだけ</strong>なので、編集すればスライドを開き直したときに反映されます。
+          組み込みの <span className="mono">default</span> / <span className="mono">gaia</span> /{' '}
+          <span className="mono">uncover</span> は登録なしで使えます。
+        </div>
+        <div className="col" style={{ gap: 6 }}>
+          {(config.settings.marpThemes ?? []).map((path, i) => (
+            <div className="row" key={path}>
+              <input className="input mono small" readOnly value={path} />
+              <button
+                className="btn sm ghost"
+                onClick={() =>
+                  patch((x) => {
+                    x.marpThemes = (x.marpThemes ?? []).filter((_, j) => j !== i);
+                  })
+                }
+              >
+                外す
+              </button>
+            </div>
+          ))}
+          {(config.settings.marpThemes ?? []).length === 0 && (
+            <div className="small muted">まだ登録されていません。</div>
+          )}
+        </div>
+        <button
+          className="btn sm"
+          style={{ marginTop: 10 }}
+          onClick={async () => {
+            const abs = await api.file.pick([{ name: 'CSS', extensions: ['css'] }]);
+            if (!abs) return;
+            patch((x) => {
+              const list = x.marpThemes ?? [];
+              if (!list.includes(abs)) x.marpThemes = [...list, abs];
+            });
+          }}
+        >
+          テーマ CSS を追加…
+        </button>
+      </div>
+
       <div className="row" style={{ marginTop: 16 }}>
         <button className="btn sm" onClick={() => api.config.reveal()}>
           設定ファイルの場所を開く

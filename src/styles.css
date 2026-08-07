@@ -472,3 +472,9 @@ table.data th { color: var(--fg-dim); font-weight: 600; font-size: 11px; }
   position: absolute; right: 2.4vw; bottom: 2.4vh;
   font-size: 14px; color: #8a97ab;
 }
+
+/* ---------------- Marp Core で描くスライド ---------------- */
+/* Marp のテーマは svg を 100vw × 100vh にするが、ここは画面全体ではないので上書きする */
+.slide-marp { flex: 1; min-height: 0; display: grid; place-items: center; background: #0a0f1a; }
+.slide-marp .marpit { width: 100%; height: 100%; display: grid; place-items: center; }
+.slide-marp div.marpit > svg[data-marpit-svg] { width: 100%; height: 100%; }

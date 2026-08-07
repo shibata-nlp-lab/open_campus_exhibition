@@ -55,7 +55,18 @@ interface StepProps<T extends Content = Content> {
 | `inline` | `inlineText`（**config.json の中**。assets には置かない） |
 | `file` | `externalPath`（ユーザーの .md を絶対パスで参照。Marp で編集した内容が毎回反映される） |
 
-Marp 記法は [src/lib/markdown.ts](../src/lib/markdown.ts) の `parseMarp()` が解釈します。
+**フロントマターに `marp: true` があるものは [src/lib/marp.ts](../src/lib/marp.ts) が
+Marp Core に渡します。** テーマ CSS（`default` / `gaia` / `uncover` と、設定画面で登録した自作テーマ）が
+そのまま効きます。`marp: true` は Marp 自身のオプトイン用フラグでもあるので、
+**付いていない既存の教材は従来の簡易描画のままで、見た目が変わりません**。
+
+Marp Core は 3.5MB あるので動的 import にしてあり、Marp のスライドを開くまで読み込みません。
+出力は `htmlAsArray` でページごとに受け取り、CSS が `div.marpit > svg > …` を前提にしているので
+`div.marpit` で包んで描きます。テーマ CSS は svg を `100vw × 100vh` にするため、
+アプリ側の CSS で `100%` に上書きしています。
+外部フォントの `@import` は落とします（回線の無い会場で待たされないため）。
+
+`marp: true` が無い場合の簡易描画は [src/lib/markdown.ts](../src/lib/markdown.ts) の `parseMarp()` が解釈します。
 フロントマターの `style:` とページごとのディレクティブ（`_class` など）を取り出し、
 `^---$` でページに割ります（コードフェンスの中の `---` では割りません）。
 外部 .md の相対パス画像は `ocfile://` に書き換えます（`resolveRelativeAssets`）。

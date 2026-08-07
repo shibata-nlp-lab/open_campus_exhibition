@@ -136,6 +136,11 @@ function takeDirectives(text: string, carried: Directives): { markdown: string; 
   return { markdown, own };
 }
 
+/** フロントマターだけを読む（`marp: true` の判定などに使う） */
+export function frontMatterOf(src: string): Record<string, string> {
+  return readFrontMatter(src.replace(/\r\n/g, '\n').split('\n')).data;
+}
+
 /** Marp 記法の Markdown を、ページとスタイルに分解する */
 export function parseMarp(src: string): MarpDoc {
   const { data, rest } = readFrontMatter(src.replace(/\r\n/g, '\n').split('\n'));
