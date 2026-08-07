@@ -88,12 +88,6 @@ async function poolWords(source: NeighbourSource): Promise<string[]> {
   return VOCABULARY;
 }
 
-const POOL_LABEL: Record<NeighbourSource, string> = {
-  curated: '辞書',
-  tokenizer: 'o200k_base 由来の日本語',
-  llmjp: 'llm-jp 由来の日本語',
-};
-
 async function loadPool(source: NeighbourSource, spec: EmbedSpec): Promise<Pool> {
   const cacheKey =
     spec.source === 'ruri'
@@ -158,6 +152,8 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
   const mode = content.tokenizerMode ?? 'gpt';
   const ruriSize = content.ruriSize ?? '130m';
   const llmjpSize = content.llmjpSize ?? '150m';
+  /** 単語の下に番号（トークンID）を出すか */
+  const showId = content.showTokenId ?? true;
 
   const run = async () => {
     const t = text.trim();
@@ -212,7 +208,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
     }
   };
 
-  /** 選んだトークンに意味が近いことばを、プール全体から探す */
+  /** 選んだ単語に意味が近いことばを、プール全体から探す */
   const neighbours = useMemo(() => {
     if (!vectors?.[selected] || !pool) return [];
     const target = centerVec(vectors[selected], pool.mean);
@@ -221,10 +217,12 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
       .filter((x) => x.word !== tokens[selected]?.text)
       .sort((a, b) => b.sim - a.sim)
       .slice(0, 5);
-    // センタリング後の値は絶対値が小さくなるので、1位を100とした相対値で見せる
+    // relative: 1位を100とした相対値（中心化すると絶対値が小さくなるため）
+    // cosine:   コサイン類似度そのもの
     const top = list[0]?.sim ?? 1;
-    return list.map((x) => ({ ...x, shown: pool.mean ? x.sim / (top || 1) : x.sim }));
-  }, [vectors, pool, selected, tokens]);
+    const relative = (content.similarityDisplay ?? 'relative') === 'relative';
+    return list.map((x) => ({ ...x, shown: relative ? x.sim / (top || 1) : x.sim }));
+  }, [vectors, pool, selected, tokens, content.similarityDisplay]);
 
   /**
    * 地図用のプール。数千語をそのまま描くと潰れるので間引く。
@@ -244,7 +242,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
     return { idx, words: idx.map((i) => pool.words[i]), vectors: idx.map((i) => pool.vectors[i]) };
   }, [pool, neighbours]);
 
-  /** トークンとプールを同じ空間で2次元に落とす */
+  /** 単語とプールを同じ空間で2次元に落とす */
   const projected = useMemo(() => {
     if (!vectors || !mapPool) return null;
     const all = pca2([...vectors, ...mapPool.vectors]);
@@ -274,38 +272,28 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
           </div>
         )}
         <button className="btn lg primary" onClick={run} disabled={!text.trim() || busy}>
-          {busy ? '準備中…' : 'トークンに分けてみる ▶'}
+          {busy ? '準備中…' : '単語に分けてみる ▶'}
         </button>
       </div>
     );
   }
 
-  /* ---------- トークン ---------- */
+  /* ---------- 単語分割 ---------- */
   if (phase === 'tokens') {
     return (
       <div className="stage fade-in">
-        <span className="chip">STEP 1 — トークナイズ</span>
-        <h2>文章は「トークン」という小さなかたまりに分けられる</h2>
+        <span className="chip">STEP 1 — 単語分割</span>
+        <h2>文章は「単語」の小さなかたまりに分けられる</h2>
         <div className="token-line">
           {tokens.map((t, i) => (
             <span key={i} className="token" style={{ background: tokenColor(i), borderColor: tokenBorder(i) }}>
               {t.text === ' ' ? '␣' : t.text}
-              <span className="id">{t.id}</span>
+              {showId && <span className="id">{t.id}</span>}
             </span>
           ))}
         </div>
         <p className="lead">
-          {tokens.length} 個のトークン ／ 下の数字がトークンID
-          <br />
-          <span style={{ fontSize: '.75em' }}>
-            {approx
-              ? '簡易分割'
-              : usedMode === 'llmjp'
-                ? '日本語向けに作られた llm-jp のトークナイザ'
-                : usedMode === 'ruri'
-                  ? 'Ruri v3 が実際に使うトークナイザ'
-                  : 'GPT-4o と同じ o200k_base'}
-          </span>
+          {tokens.length} 個の単語{showId ? ' ／ 下の数字は単語につけられた番号' : ''}
         </p>
         <div className="row">
           <button className="btn lg" onClick={() => setPhase('input')}>入力しなおす</button>
@@ -324,7 +312,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
   return (
     <div className="stage scroll fade-in" style={{ gap: 14 }}>
       <span className="chip">STEP 2 — ベクトル化（埋め込み）</span>
-      <h2>トークンは「意味を表す数字の列」になる</h2>
+      <h2>単語は「意味を表す数字の列」になる</h2>
 
       {busy && <div className="spin" />}
       {offline && (
@@ -375,19 +363,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
 
       {neighbours.length > 0 && (
         <div className="neighbours">
-          <div className="small muted">
-            「{selectedText}」に意味が近いことば
-            <br />
-            <span style={{ fontSize: '.9em' }}>
-              語彙: {POOL_LABEL[content.neighbourSource ?? 'curated']}（
-              {pool ? pool.words.length.toLocaleString() : 0} 語） ／ 埋め込み:{' '}
-              {(content.embeddingSource ?? 'openai') === 'ruri'
-                ? `Ruri v3 ${ruriSize}`
-                : (content.embeddingSource ?? 'openai') === 'llmjp'
-                  ? `llm-jp-3-${llmjpSize} の埋め込み層`
-                  : config.settings.embeddingModel}
-            </span>
-          </div>
+          <div className="small muted">「{selectedText}」に意味が近いことば</div>
           <div className="row" style={{ justifyContent: 'center', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
             {neighbours.map((n) => (
               <span key={n.word} className="neighbour">

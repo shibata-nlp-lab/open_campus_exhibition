@@ -2,12 +2,15 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type {
   ApiResult,
   AppConfig,
+  AuthState,
   ClearResult,
   DisplayInfo,
   PlaybackCommand,
   PlaybackState,
   ResultRecord,
+  Role,
   TokenCandidate,
+  UserInfo,
 } from '../src/types';
 
 /** main は ApiResult で返す（メインプロセスのログを汚さないため）。ここで例外に戻す */
@@ -130,6 +133,20 @@ const api = {
         ipcRenderer.off('controller:presence', handler);
       };
     },
+  },
+  /** 展示員ユーザーと権限。PIN のハッシュはここには来ない */
+  auth: {
+    state: (): Promise<AuthState> => ipcRenderer.invoke('auth:state'),
+    role: (): Promise<Role> => ipcRenderer.invoke('auth:role'),
+    login: (id: string, pin: string): Promise<UserInfo> => unwrap(ipcRenderer.invoke('auth:login', { id, pin })),
+    logout: (): Promise<boolean> => ipcRenderer.invoke('auth:logout'),
+    list: (): Promise<UserInfo[]> => ipcRenderer.invoke('auth:list'),
+    add: (name: string, pin: string, role: Role): Promise<UserInfo> =>
+      unwrap(ipcRenderer.invoke('auth:add', { name, pin, role })),
+    setRole: (id: string, role: Role): Promise<UserInfo> => unwrap(ipcRenderer.invoke('auth:setRole', { id, role })),
+    setPin: (id: string, pin: string): Promise<boolean> => unwrap(ipcRenderer.invoke('auth:setPin', { id, pin })),
+    remove: (id: string): Promise<boolean> => unwrap(ipcRenderer.invoke('auth:remove', id)),
+    reveal: () => ipcRenderer.invoke('auth:reveal'),
   },
   results: {
     append: (record: ResultRecord) => ipcRenderer.invoke('result:append', record),

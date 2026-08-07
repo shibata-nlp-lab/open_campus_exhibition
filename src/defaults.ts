@@ -48,7 +48,7 @@ export const CONTENT_LABELS: Record<ContentType, string> = {
   video: '動画',
   slide: 'スライド',
   quiz: 'クイズ',
-  interactive1: 'インタラクティブ1（トークナイズ）',
+  interactive1: 'インタラクティブ1（単語分割）',
   interactive2: 'インタラクティブ2（次単語予測）',
   game: 'ゲーム（次の単語当て）',
   survey: 'アンケート',
@@ -106,6 +106,8 @@ export function createContent(type: ContentType): Content {
         embeddingSource: 'openai',
         ruriSize: '130m',
         llmjpSize: '150m',
+        similarityDisplay: 'relative',
+        showTokenId: true,
       } as Interactive1Content;
     case 'interactive2':
       return {

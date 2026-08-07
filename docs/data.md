@@ -14,6 +14,7 @@
 | `config.json` | 設定・コンテンツ・シナリオ（**アプリの状態のほぼ全部**） |
 | `assets/` | 取り込んだ動画・PDF・画像・音声。スライド本文は config.json 側に入る |
 | `openai.key` | OpenAI API キー。`safeStorage` で暗号化 |
+| `users.json` | 展示員ユーザー。PIN は scrypt でハッシュ化（[permissions.md](permissions.md)） |
 | `results.jsonl` | 集計ログ（1行1レコード） |
 | `results-YYYYMMDD-HHMMSS.jsonl` | リセット時の自動バックアップ |
 | `cache/` | 埋め込みのキャッシュ |

@@ -690,6 +690,40 @@ function Interactive1Editor({ c, patch }: { c: Interactive1Content; patch: Patch
         </select>
       </Field>
 
+      <Toggle
+        label="単語の下に番号（トークンID）を表示する"
+        checked={c.showTokenId ?? true}
+        onChange={(v) => patch((x) => void (x.showTokenId = v))}
+      />
+
+      <Field
+        label="「意味が近いことば」の数値の出し方"
+        helpTone="ok"
+        help={
+          <>
+            <strong>1位を100%とする</strong>… 一番近いことばが必ず 100% になり、以下はそれとの比です。
+            ローカルモデルは中心化のあと値が小さくなるため、そのまま出すと「1位でも 30%」となって
+            説明しづらいのを避けられます。<strong>順位を見せたいときはこちら。</strong>
+            <br />
+            <strong>コサイン類似度そのもの</strong>… 尺度が一定なので、別の語どうしで数値を比べられます。
+            ただし 1 位でも小さい値になることがあります。<strong>数値の意味を正確に見せたいときはこちら。</strong>
+            <br />
+            どちらでも並び順は変わりません。変わるのは表示される数字だけです。
+          </>
+        }
+      >
+        <select
+          className="select"
+          value={c.similarityDisplay ?? 'relative'}
+          onChange={(e) =>
+            patch((x) => void (x.similarityDisplay = e.target.value as Interactive1Content['similarityDisplay']))
+          }
+        >
+          <option value="relative">1位を100%とした相対値</option>
+          <option value="cosine">コサイン類似度そのもの</option>
+        </select>
+      </Field>
+
       <Field
         label="「意味が近いことば」を探す対象"
         hint="来場者がトークンを選んだとき、どの語の集まりの中から近いものを探すかを決めます。"

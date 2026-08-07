@@ -86,6 +86,8 @@ export function migrate(config: AppConfig): AppConfig {
       c.embeddingSource ??= 'openai';
       c.ruriSize ??= '130m';
       c.llmjpSize ??= '150m';
+      c.similarityDisplay ??= 'relative';
+      c.showTokenId ??= true;
     }
     if (c.type === 'standby') {
       c.nextStartMode ??= 'hidden';

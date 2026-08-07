@@ -133,6 +133,23 @@ OS が暗号化を提供しない環境では `plain:` プレフィックス付�
 | `controller.exists()` | `controller:exists` | 進行画面が ◀▶ ボタンを出すかの判断に使う |
 | `controller.onPresence(cb)` | `controller:presence` | コントローラの開閉時に配信 |
 
+## auth（ユーザーと権限）
+
+| API | チャネル | 包む | 説明 |
+| --- | --- | --- | --- |
+| `auth.state()` | `auth:state` | | `{ enabled, current }`。`enabled: false` は認証を使っていない初期状態 |
+| `auth.role()` | `auth:role` | | 実効ロール（未認証の初期状態は `owner`） |
+| `auth.login(id, pin)` | `auth:login` | ✓ | |
+| `auth.logout()` | `auth:logout` | | |
+| `auth.list()` | `auth:list` | | **`id` / `name` / `role` だけ**。ハッシュは返しません |
+| `auth.add(name, pin, role)` | `auth:add` | ✓ | 1人目は必ずオーナー |
+| `auth.setRole(id, role)` | `auth:setRole` | ✓ | |
+| `auth.setPin(id, pin)` | `auth:setPin` | ✓ | 自分の分は自分で変えられる |
+| `auth.remove(id)` | `auth:remove` | ✓ | |
+| `auth.reveal()` | `auth:reveal` | | users.json をファイラで表示 |
+
+詳細は [permissions.md](permissions.md)。
+
 ## results
 
 | API | チャネル | 説明 |

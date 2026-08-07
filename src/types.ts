@@ -116,6 +116,13 @@ export type RuriSize = '30m' | '130m' | '310m';
 /** 埋め込み層を借りてくる llm-jp-3 のモデルサイズ（大きいほど次元が高い） */
 export type LlmJpSize = '150m' | '440m' | '1.8b';
 
+/**
+ * 「意味が近いことば」の数値の見せ方。
+ * - relative: 1位を100%とした相対値。中心化すると値が小さくなるので順位が読みやすい
+ * - cosine:   コサイン類似度そのもの。尺度は一定だが、1位でも 30% 程度になることがある
+ */
+export type SimilarityDisplay = 'relative' | 'cosine';
+
 export interface Interactive1Content extends ContentBase {
   type: 'interactive1';
   prompt: string;
@@ -126,6 +133,10 @@ export interface Interactive1Content extends ContentBase {
   embeddingSource: EmbeddingSource;
   ruriSize: RuriSize;
   llmjpSize: LlmJpSize;
+  /** 近いことばの数値の出し方 */
+  similarityDisplay: SimilarityDisplay;
+  /** 単語の下に ID を出すか（来場者向けには不要なことが多い） */
+  showTokenId: boolean;
 }
 
 export interface Interactive2Content extends ContentBase {
@@ -278,6 +289,41 @@ export interface ClearResult {
   cleared: number;
   /** 退避先の絶対パス（0 件のときは null） */
   backup: string | null;
+}
+
+/* ---------- ユーザーと権限 ---------- */
+
+/**
+ * 展示員ごとの役割。上から順に強い。
+ * - owner:  すべての管理画面 ＋ 他のユーザーの権限変更
+ * - admin:  API 以外の管理画面 ＋ 自分より下位（editor / user）の権限変更
+ * - editor: シナリオとコンテンツのみ
+ * - user:   既存シナリオの実行のみ（管理画面は開けない）
+ */
+export type Role = 'owner' | 'admin' | 'editor' | 'user';
+
+export const ROLE_LABELS: Record<Role, string> = {
+  owner: 'オーナー',
+  admin: 'アドミニストレーター',
+  editor: 'エディター',
+  user: 'ユーザー',
+};
+
+/** 強さの順位。数値が大きいほど強い（下位判定に使う） */
+export const ROLE_RANK: Record<Role, number> = { owner: 3, admin: 2, editor: 1, user: 0 };
+
+/** 画面に出すユーザー情報。PIN のハッシュは絶対にレンダラへ渡さない */
+export interface UserInfo {
+  id: string;
+  name: string;
+  role: Role;
+}
+
+/** ログイン状態 */
+export interface AuthState {
+  /** ユーザーが1人も登録されていない＝認証を使っていない（初期状態） */
+  enabled: boolean;
+  current: UserInfo | null;
 }
 
 /* ---------- IPC ---------- */
