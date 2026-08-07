@@ -55,9 +55,16 @@ interface StepProps<T extends Content = Content> {
 | `inline` | `inlineText`（**config.json の中**。assets には置かない） |
 | `file` | `externalPath`（ユーザーの .md を絶対パスで参照。Marp で編集した内容が毎回反映される） |
 
-Marp 対応として、フロントマター（先頭の `---` ブロック）と `<!-- -->` のディレクティブを落とし、
-`^---$` でページ分割します。外部 .md の相対パス画像は `ocfile://` に書き換えて表示します
-（`resolveRelativeAssets`）。**Marp のテーマ CSS は当たりません**。デザインを保ちたいなら PDF 形式で登録します。
+Marp 記法は [src/lib/markdown.ts](../src/lib/markdown.ts) の `parseMarp()` が解釈します。
+フロントマターの `style:` とページごとのディレクティブ（`_class` など）を取り出し、
+`^---$` でページに割ります（コードフェンスの中の `---` では割りません）。
+外部 .md の相対パス画像は `ocfile://` に書き換えます（`resolveRelativeAssets`）。
+
+`style:` は `@scope (.marp-scope) { … }` で囲ってから注入するので、**スライドの CSS が
+アプリの他の画面へ漏れません**。ページ本文は `<section class="…">` で包むため、
+`section.title * { … }` のような Marp 由来のセレクタがそのまま効きます。
+
+**`theme:` は当たりません**（テーマ CSS を同梱していないため）。デザインを保ちたいなら PDF 形式で登録します。
 
 PDF は pdfjs-dist でページ送りします。`autoAdvanceSec` は markdown / pdf でのみ有効です。
 
