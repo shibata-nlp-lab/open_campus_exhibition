@@ -126,9 +126,9 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
   const finished = steps >= content.maxSteps || (cands.length === 0 && !busy);
 
   return (
-    <div className="stage fade-in" style={{ gap: 20 }}>
+    <div className="stage predict fade-in">
       <div className="row">
-        <span className="chip">次の1語を予測中</span>
+        <span className="chip lg">次の1語を予測中</span>
         {offline && <span className="chip" style={{ background: '#37291a', color: '#ffd9a1' }}>オフライン簡易モード</span>}
       </div>
 

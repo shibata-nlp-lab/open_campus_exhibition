@@ -340,7 +340,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
       </div>
 
       <div className="vec-numbers">
-        <div className="small muted">
+        <div className="vec-caption">
           「{selectedText}」は、こんな <b>{vec.length} 次元のベクトル</b> になっている
         </div>
         <div className="vector">
@@ -376,13 +376,6 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
       )}
 
       <div className="map-wrap">
-        <div className="small muted" style={{ marginBottom: 6 }}>
-          意味の地図（{mapPool ? mapPool.words.length : 0} 語と一緒に、2次元へ圧縮して配置
-          {pool && mapPool && pool.words.length > mapPool.words.length
-            ? `／全 ${pool.words.length.toLocaleString()} 語から間引き`
-            : ''}
-          ）
-        </div>
         <Scatter
           vocabPoints={projected?.vocab ?? []}
           vocabLabels={mapPool?.words ?? []}

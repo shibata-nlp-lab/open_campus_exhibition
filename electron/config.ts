@@ -88,6 +88,8 @@ export function migrate(config: AppConfig): AppConfig {
       c.llmjpSize ??= '150m';
       c.similarityDisplay ??= 'relative';
       c.showTokenId ??= true;
+      // 初期文言の言い換え。手を入れていないものだけ差し替える
+      if (c.prompt === '好きな文章を入力してみよう') c.prompt = '好きな文を入力してみよう';
     }
     if (c.type === 'standby') {
       c.nextStartMode ??= 'hidden';

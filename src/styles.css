@@ -409,3 +409,35 @@ table.data th { color: var(--fg-dim); font-weight: 600; font-size: 11px; }
   gap: 18px; height: 100%; background: var(--bg); text-align: center;
 }
 .launcher h1 { margin: 0; }
+
+/* ---------------- 体験①：ベクトルの見出し ---------------- */
+.vec-caption { font-size: clamp(20px, 2.2vw, 32px); color: var(--fg-dim); }
+.vec-caption b { color: var(--fg); }
+
+/* ---------------- 体験②：画面全体を使う ---------------- */
+.chip.lg { font-size: clamp(16px, 1.8vw, 26px); padding: 6px 18px; border-radius: 999px; }
+
+/* 縦に間延びさせず、候補リストが主役になるように広げる */
+.stage.predict {
+  justify-content: center;
+  gap: clamp(14px, 2vh, 28px);
+  padding: 3vh 4vw;
+  width: 100%;
+}
+.stage.predict .generated {
+  font-size: clamp(26px, 3.4vw, 52px);
+  width: min(1400px, 92vw);
+  max-width: none;
+  padding: clamp(18px, 2.4vh, 30px) clamp(22px, 2.5vw, 34px);
+}
+.stage.predict .cand-list { width: min(1100px, 92vw); gap: clamp(8px, 1.2vh, 14px); }
+.stage.predict .cand { padding: clamp(12px, 1.8vh, 22px) clamp(18px, 2vw, 28px); border-radius: 14px; }
+.stage.predict .cand .tok { font-size: clamp(24px, 2.8vw, 42px); }
+.stage.predict .cand .p { font-size: clamp(16px, 1.6vw, 24px); }
+.stage.predict .lead { font-size: clamp(18px, 2vw, 30px); }
+.stage.predict h2 { font-size: clamp(26px, 3vw, 44px); }
+
+/* 拡大しても1画面に収める。あふれる場合は中身側でスクロールさせ、画面は動かさない */
+.stage.predict { overflow: hidden; }
+.stage.predict .generated { max-height: 32vh; overflow-y: auto; }
+.stage.predict .cand-list { max-height: 44vh; overflow-y: auto; }

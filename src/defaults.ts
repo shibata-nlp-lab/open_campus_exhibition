@@ -98,7 +98,7 @@ export function createContent(type: ContentType): Content {
       return {
         ...base,
         type,
-        prompt: '好きな文章を入力してみよう',
+        prompt: '好きな文を入力してみよう',
         placeholder: '例）今日はオープンキャンパスに来ました',
         examples: ['今日はオープンキャンパスに来ました', '大規模言語モデルは言葉を数字に変換する'],
         neighbourSource: 'curated',
