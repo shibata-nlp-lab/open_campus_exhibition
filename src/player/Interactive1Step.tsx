@@ -254,9 +254,9 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
     return (
       <div className="stage entry">
         <span className="chip lg">体験①</span>
-        {/* 一番言いたいのは「何が起きるか」なので、そちらを見出しに。入力のお願いはその下 */}
+        {/* 一番言いたいのは「何が起きるか」。入力のお願い（content.prompt）は
+            入力欄とボタンを見れば分かるので出さない */}
         <h1>入力した文が、AIの中でどう「数字」に変わるのか見てみよう。</h1>
-        <p className="lead">{content.prompt}</p>
         <input
           className="big-input"
           autoFocus
@@ -282,7 +282,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
   /* ---------- 単語分割 ---------- */
   if (phase === 'tokens') {
     return (
-      <div className="stage fade-in">
+      <div className="stage tokens fade-in">
         <span className="chip lg">STEP 1 — 単語分割</span>
         <h2>文章は「単語」の小さなかたまりに分けられる</h2>
         <div className="token-line">
