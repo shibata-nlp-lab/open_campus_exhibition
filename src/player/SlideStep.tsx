@@ -170,7 +170,11 @@ function PdfSlides({
       try {
         const pdfjs: any = await import('pdfjs-dist');
         pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
-        const doc = await pdfjs.getDocument(api.asset.url(rel)).promise;
+        // URL ではなく中身を渡す。pdf.js は http/https 以外の URL を XHR で取りに行き、
+        // oc:// だとステータス 0 で «Unexpected server response (0)» になる
+        const bytes = await api.asset.read(rel);
+        if (cancelled) return;
+        const doc = await pdfjs.getDocument({ data: bytes }).promise;
         if (cancelled) return;
         docRef.current = doc;
         setTotal(doc.numPages);

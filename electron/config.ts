@@ -172,9 +172,13 @@ export function saveConfig(config: AppConfig) {
 export function importAsset(sourcePath: string): string {
   ensureDirs();
   const ext = path.extname(sourcePath);
+  // macOS のファイル名は濁点・半濁点が分かれた形（NFD）で渡ってくる。そのままだと
+  // 「プレゼンテーション」の ゛゜ が許可文字に入らず「フ_レセ_ンテ_ション」になってしまうので、
+  // 先に合成してから絞り込む。長音符（ー）も残す
   const base = path
     .basename(sourcePath, ext)
-    .replace(/[^\w\-.ぁ-んァ-ヶ一-龠]/g, '_')
+    .normalize('NFC')
+    .replace(/[^\w\-.ぁ-んァ-ヶー一-龠々〆〇]/g, '_')
     .slice(0, 40);
   const name = `${Date.now().toString(36)}_${base}${ext}`;
   fs.copyFileSync(sourcePath, path.join(assetsDir(), name));
