@@ -289,7 +289,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
     return (
       <div className="stage tokens fade-in">
         <span className="chip lg">STEP 1 — 単語分割</span>
-        <h2>文章は「単語」の小さなかたまりに分けられる</h2>
+        <h2>文は「単語」の小さなかたまりに分けられる</h2>
         <div className="token-line">
           {tokens.map((t, i) => (
             <span key={i} className="token" style={{ background: tokenColor(i), borderColor: tokenBorder(i) }}>
