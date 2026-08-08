@@ -3,6 +3,7 @@ import type React from 'react';
 import type {
   AudioSetting,
   BranchContent,
+  BranchTarget,
   Content,
   GameContent,
   Interactive1Content,
@@ -1102,6 +1103,103 @@ function StandbyEditor({ c, patch }: { c: StandbyContent; patch: Patch<StandbyCo
 
 /* ---------------- 分岐（体験に戻る） ---------------- */
 
+function BranchTargetRow({
+  target,
+  ti,
+  patch,
+  choices,
+  rowProps,
+  handleProps,
+}: {
+  target: BranchTarget;
+  ti: number;
+  patch: Patch<BranchContent>;
+  choices: Content[];
+  rowProps: (i: number) => Record<string, unknown>;
+  handleProps: (i: number, ref: React.RefObject<HTMLElement>) => Record<string, unknown>;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { className, ...rest } = rowProps(ti) as { className: string };
+  const picked = choices.find((x) => x.id === target.contentId);
+  return (
+    <div ref={ref} className={`drag-row ${className}`} {...rest}>
+      <span className="drag-handle" title="ドラッグして並べ替え" {...handleProps(ti, ref)}>
+        ⠿
+      </span>
+      <select
+        className="select"
+        style={{ flex: 1 }}
+        value={target.contentId ?? ''}
+        onChange={(e) => patch((x) => void (x.targets[ti].contentId = e.target.value || null))}
+      >
+        <option value="">（選択なし）</option>
+        {choices.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}（{CONTENT_LABELS[t.type]}）
+          </option>
+        ))}
+      </select>
+      <input
+        className="input"
+        style={{ flex: 1 }}
+        // 空ならコンテンツ名がそのままボタンになるので、それを薄字で見せておく
+        placeholder={picked ? picked.name : 'ボタンの文言'}
+        value={target.label}
+        onChange={(e) => patch((x) => void (x.targets[ti].label = e.target.value))}
+      />
+      <button className="btn sm danger" onClick={() => patch((x) => void x.targets.splice(ti, 1))}>
+        ✕
+      </button>
+    </div>
+  );
+}
+
+function BranchTargetList({
+  c,
+  patch,
+  choices,
+}: {
+  c: BranchContent;
+  patch: Patch<BranchContent>;
+  choices: Content[];
+}) {
+  const { rowProps, handleProps } = useDragReorder((from, to) =>
+    patch((x) => {
+      const [item] = x.targets.splice(from, 1);
+      x.targets.splice(to, 0, item);
+    })
+  );
+  const targets = c.targets ?? [];
+  return (
+    <div className="col" style={{ gap: 6 }}>
+      {targets.map((t, ti) => (
+        <BranchTargetRow
+          key={t.id}
+          target={t}
+          ti={ti}
+          patch={patch}
+          choices={choices}
+          rowProps={rowProps}
+          handleProps={handleProps}
+        />
+      ))}
+      {targets.length === 0 && (
+        <div className="small muted">
+          戻り先がありません。このままだと進行画面には「{c.stayLabel || 'ここで終わる'}」だけが出ます。
+        </div>
+      )}
+      <div>
+        <button
+          className="btn sm"
+          onClick={() => patch((x) => void (x.targets ??= []).push({ id: uid('bt'), contentId: null, label: '' }))}
+        >
+          ＋ 戻り先を追加
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function BranchEditor({
   c,
   patch,
@@ -1113,13 +1211,14 @@ function BranchEditor({
 }) {
   // 戻り先は体験・ゲームを想定しているが、スライドに戻したい場合もあるので
   // 分岐そのものと待機画面以外は選べるようにしておく
-  const targets = contents.filter((x) => x.type !== 'branch' && x.type !== 'standby');
+  const choices = contents.filter((x) => x.type !== 'branch' && x.type !== 'standby');
   return (
     <>
       <div className="banner warn" style={{ marginBottom: 14 }}>
-        説明のあとに置いて「体験したい人だけ」を前の体験に戻す画面です。
-        戻った先で「次へすすむ」を押すと、次のコンテンツではなく<strong>この画面に帰ってきます</strong>。
-        そこで「{c.stayLabel || 'ここで終わる'}」を選ぶと先へ進みます。
+        説明のあとに置いて「体験したい人だけ」を前の体験に戻す画面です。<strong>戻り先は何個でも置けます</strong>
+        （体験①・体験②・ゲームを並べる、など）。戻った先で「次へすすむ」を押すと、
+        次のコンテンツではなく<strong>この画面に帰ってきます</strong>ので、続けて別のものも選べます。
+        「{c.stayLabel || 'ここで終わる'}」を選ぶと先へ進みます。
       </div>
       <Field label="見出し">
         <input className="input" value={c.message} onChange={(e) => patch((x) => void (x.message = e.target.value))} />
@@ -1132,43 +1231,18 @@ function BranchEditor({
         />
       </Field>
       <Field
-        label="戻る先のコンテンツ"
-        hint="同じシナリオの中に、この分岐より前に置いてあるものを選んでください。シナリオに入っていないと戻るボタンは出ません。"
+        label="戻り先（並べた順にボタンが出ます）"
+        hint="同じシナリオの中に、この分岐より前に置いてあるものを選んでください。シナリオに入っていない戻り先は、ボタンごと出ません。⠿ をドラッグすると並べ替えられます。"
       >
-        <select
-          className="select"
-          value={c.targetContentId ?? ''}
-          onChange={(e) => patch((x) => void (x.targetContentId = e.target.value || null))}
-        >
-          <option value="">（選択なし）</option>
-          {targets.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}（{CONTENT_LABELS[t.type]}）
-            </option>
-          ))}
-        </select>
+        <BranchTargetList c={c} patch={patch} choices={choices} />
       </Field>
-      {!c.targetContentId && (
-        <div className="small muted" style={{ marginTop: -6, marginBottom: 12 }}>
-          戻り先が未設定のあいだは、進行画面には「{c.stayLabel || 'ここで終わる'}」だけが出ます。
-        </div>
-      )}
-      <div className="row">
-        <div style={{ flex: 1 }}>
-          <Field label="戻るボタンの文言">
-            <input className="input" value={c.goLabel} onChange={(e) => patch((x) => void (x.goLabel = e.target.value))} />
-          </Field>
-        </div>
-        <div style={{ flex: 1 }}>
-          <Field label="進むボタンの文言">
-            <input
-              className="input"
-              value={c.stayLabel}
-              onChange={(e) => patch((x) => void (x.stayLabel = e.target.value))}
-            />
-          </Field>
-        </div>
-      </div>
+      <Field label="進むボタンの文言">
+        <input
+          className="input"
+          value={c.stayLabel}
+          onChange={(e) => patch((x) => void (x.stayLabel = e.target.value))}
+        />
+      </Field>
       <AudioFields audio={c.audio} patch={(fn) => patch((x) => fn(x.audio))} />
     </>
   );

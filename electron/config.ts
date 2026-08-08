@@ -104,6 +104,18 @@ export function migrate(config: AppConfig): AppConfig {
     if (c.type === 'interactive2') {
       c.screenAudio = { ...emptyInteractive2Audio(), ...(c.screenAudio ?? {}) };
     }
+    if (c.type === 'branch') {
+      // 戻り先は当初 1 つだけ（targetContentId / goLabel）だった。複数置けるようにしたので、
+      // 古い形は 1 件の targets に畳む
+      const old = c as unknown as { targetContentId?: string | null; goLabel?: string };
+      if (!Array.isArray(c.targets)) {
+        c.targets = old.targetContentId
+          ? [{ id: `bt_${Date.now().toString(36)}`, contentId: old.targetContentId, label: old.goLabel ?? '' }]
+          : [];
+      }
+      delete old.targetContentId;
+      delete old.goLabel;
+    }
     if (c.type === 'standby') {
       c.nextStartMode ??= 'hidden';
       c.nextStartTime ??= '';
