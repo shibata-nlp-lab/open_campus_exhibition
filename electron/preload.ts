@@ -48,6 +48,9 @@ const api = {
   },
   file: {
     pick: (filters: Electron.FileFilter[]): Promise<string | null> => ipcRenderer.invoke('file:pick', filters),
+    pickDir: (): Promise<string | null> => ipcRenderer.invoke('file:pickDir'),
+    /** フォルダ直下の指定拡張子のファイル（名前順）。ext は '.csv' のように書く */
+    listDir: (dir: string, ext: string): Promise<string[]> => unwrap(ipcRenderer.invoke('file:listDir', { dir, ext })),
     readText: (abs: string): Promise<string> => unwrap(ipcRenderer.invoke('file:readText', abs)),
     exists: (abs: string): Promise<boolean> => ipcRenderer.invoke('file:exists', abs),
     reveal: (abs: string) => ipcRenderer.invoke('file:reveal', abs),

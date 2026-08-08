@@ -34,4 +34,4 @@ contents/*
 
 # ノートブックのローカル環境と出力
 notebooks/venv/
-notebooks/races_*.csv
+notebooks/races/

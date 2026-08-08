@@ -354,6 +354,23 @@ function registerIpc() {
     if (res.canceled || !res.filePaths[0]) return null;
     return res.filePaths[0];
   });
+  /** フォルダを選ぶ。中の CSV をまとめて取り込む用 */
+  ipcMain.handle('file:pickDir', async () => {
+    const res = await dialog.showOpenDialog({ properties: ['openDirectory'] });
+    if (res.canceled || !res.filePaths[0]) return null;
+    return res.filePaths[0];
+  });
+  /** フォルダ直下の、指定した拡張子のファイルを名前順で返す（サブフォルダは見ない） */
+  ipcMain.handle('file:listDir', (_e, args: { dir: string; ext: string }) =>
+    asResult(async () => {
+      const ext = args.ext.toLowerCase();
+      return fs
+        .readdirSync(args.dir, { withFileTypes: true })
+        .filter((d) => d.isFile() && path.extname(d.name).toLowerCase() === ext)
+        .map((d) => path.join(args.dir, d.name))
+        .sort();
+    })
+  );
   ipcMain.handle('file:readText', (_e, abs: string): ApiResult<string> => {
     try {
       return { ok: true, data: fs.readFileSync(abs, 'utf-8') };

@@ -1007,31 +1007,70 @@ function BettingEditor({ c, patch }: { c: BettingContent; patch: Patch<BettingCo
   const race = c.races[Math.min(raceIdx, Math.max(0, c.races.length - 1))];
 
   /**
-   * ノートブックが書き出した races_NN.csv を取り込む。
-   * **1ファイル1レース**で何度も取り込む使い方なので、置き換えではなく**追加**する。
+   * 読み込んだレースを既存に足す。
+   * **1ファイル1レース**で何度も取り込む使い方なので、置き換えではなく追加する。
    * 同じ race_id のものは新しいほうで差し替える（作り直したときに二重にならない）。
    */
+  const merge = (incoming: BettingRace[]) => {
+    const replaced = incoming.filter((r) => c.races.some((x) => x.id === r.id)).length;
+    if (incoming.length) {
+      patch((x) => {
+        const ids = new Set(incoming.map((r) => r.id));
+        x.races = [...x.races.filter((r) => !ids.has(r.id)), ...incoming];
+      });
+    }
+    setRaceIdx(0);
+    return replaced;
+  };
+
+  /** ノートブックが書き出した races_NN.csv を1つ取り込む */
   const importCsv = async () => {
     const abs = await api.file.pick([{ name: 'CSV', extensions: ['csv'] }]);
     if (!abs) return;
     try {
       const { races, warnings } = parseRacesCsv(await api.file.readText(abs));
-      const replaced = races.filter((r) => c.races.some((x) => x.id === r.id)).length;
-      if (races.length) {
-        patch((x) => {
-          const incoming = new Set(races.map((r) => r.id));
-          x.races = [...x.races.filter((r) => !incoming.has(r.id)), ...races];
-        });
-      }
-      setRaceIdx(0);
+      const replaced = merge(races);
       setNotice(
         races.length
-          ? [
-              `${races.length} レースを追加しました${replaced ? `（うち ${replaced} 件は同じ race_id なので差し替え）` : ''}。`,
-              ...warnings,
-            ]
+          ? [`${races.length} レースを追加しました${replaced ? `（うち ${replaced} 件は差し替え）` : ''}。`, ...warnings]
           : warnings
       );
+    } catch (e) {
+      setNotice([errText(e)]);
+    }
+  };
+
+  /**
+   * フォルダの中の CSV をまとめて取り込む。
+   * ノートブックが races_01.csv, races_02.csv … と溜めていくので、
+   * 1つずつ選ぶより、フォルダごと渡せるほうが早い。
+   * 1ファイルが壊れていても他は取り込む。
+   */
+  const importDir = async () => {
+    const dir = await api.file.pickDir();
+    if (!dir) return;
+    try {
+      const files = await api.file.listDir(dir, '.csv');
+      if (files.length === 0) return setNotice(['このフォルダに CSV がありません。']);
+      const all: BettingRace[] = [];
+      const warns: string[] = [];
+      for (const f of files) {
+        const name = f.slice(f.lastIndexOf('/') + 1);
+        try {
+          const { races, warnings } = parseRacesCsv(await api.file.readText(f));
+          all.push(...races);
+          warns.push(...warnings.map((w) => `${name}：${w}`));
+        } catch (e) {
+          warns.push(`${name}：${errText(e)}`);
+        }
+      }
+      const replaced = merge(all);
+      setNotice([
+        `${files.length} ファイルから ${all.length} レースを追加しました${
+          replaced ? `（うち ${replaced} 件は差し替え）` : ''
+        }。`,
+        ...warns,
+      ]);
     } catch (e) {
       setNotice([errText(e)]);
     }
@@ -1064,7 +1103,8 @@ function BettingEditor({ c, patch }: { c: BettingContent; patch: Patch<BettingCo
       </div>
 
       <div className="row" style={{ marginBottom: 12 }}>
-        <button className="btn" onClick={importCsv}>races_NN.csv を取り込む…</button>
+        <button className="btn" onClick={importDir}>フォルダごと取り込む…</button>
+        <button className="btn" onClick={importCsv}>CSV を1つ取り込む…</button>
         <span className="small muted">
           {c.races.length} レース登録済み（本番は毎回この中から {c.raceCount} レースをランダムに選びます）
         </span>
