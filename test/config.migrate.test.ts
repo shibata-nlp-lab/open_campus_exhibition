@@ -2,7 +2,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import type { AppConfig, Interactive1Content, SlideContent, StandbyContent } from '../src/types';
+import type {
+  AppConfig,
+  Interactive1Content,
+  Interactive2Content,
+  SlideContent,
+  StandbyContent,
+} from '../src/types';
 import { DEFAULT_ATTRIBUTE_OPTIONS, SAMPLES_VERSION } from '../src/defaults';
 
 // config.ts は app.getPath('userData') を使うので、一時ディレクトリに差し替える
@@ -83,6 +89,38 @@ describe('migrate — 新しく増えたフィールドの補完', () => {
       base({ contents: [{ id: 'c1', type: 'interactive1', name: '体験', tokenizerMode: 'ruri' } as never] })
     );
     expect((cfg.contents[0] as Interactive1Content).tokenizerMode).toBe('ruri');
+  });
+
+  it('体験①の画面ごとの音声を、3画面ぶん空で用意する', () => {
+    const cfg = migrate(base({ contents: [{ id: 'c1', type: 'interactive1', name: '体験' } as never] }));
+    const a = (cfg.contents[0] as Interactive1Content).screenAudio;
+    expect(Object.keys(a).sort()).toEqual(['input', 'tokens', 'vectors']);
+    for (const s of Object.values(a)) expect(s.src).toBeNull();
+  });
+
+  it('体験②の画面ごとの音声を、2画面ぶん空で用意する', () => {
+    const cfg = migrate(base({ contents: [{ id: 'c1', type: 'interactive2', name: '体験' } as never] }));
+    expect(Object.keys((cfg.contents[0] as Interactive2Content).screenAudio).sort()).toEqual(['input', 'predict']);
+  });
+
+  it('設定済みの画面の音声は残したまま、足りない画面だけ足す', () => {
+    // 途中のバージョンで一部の画面にだけ音を入れた config を想定
+    const cfg = migrate(
+      base({
+        contents: [
+          {
+            id: 'c1',
+            type: 'interactive1',
+            name: '体験',
+            screenAudio: { tokens: { src: 'a.mp3', volume: 0.3, loop: true } },
+          } as never,
+        ],
+      })
+    );
+    const a = (cfg.contents[0] as Interactive1Content).screenAudio;
+    expect(a.tokens).toEqual({ src: 'a.mp3', volume: 0.3, loop: true });
+    expect(a.input.src).toBeNull();
+    expect(a.vectors.src).toBeNull();
   });
 
   it('standby の開始時刻まわりに既定値を入れる', () => {

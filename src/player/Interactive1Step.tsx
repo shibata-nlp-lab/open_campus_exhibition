@@ -2,12 +2,14 @@ import { useMemo, useState } from 'react';
 import type {
   EmbeddingSource,
   Interactive1Content,
+  Interactive1Phase,
   LlmJpSize,
   NeighbourSource,
   RuriSize,
   TokenizerMode,
 } from '../types';
 import type { StepProps } from './PlayerApp';
+import { useAudio } from './useAudio';
 import { api, errText } from '../lib/api';
 import { isSubmitEnter } from '../lib/ime';
 import { listJapaneseTokens, tokenize, type Tok } from '../lib/tokenizer';
@@ -15,7 +17,7 @@ import { idsForTexts, listLlmJpVocab, tokenizeLlmJp } from '../lib/llmjp';
 import { cosine, pca2, pseudoEmbed, tokenBorder, tokenColor } from '../lib/vec';
 import { VOCABULARY } from '../content/vocabulary';
 
-type Phase = 'input' | 'tokens' | 'vectors';
+type Phase = Interactive1Phase;
 
 const EMBED_DIMS = 256;
 
@@ -154,6 +156,9 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
   const llmjpSize = content.llmjpSize ?? '150m';
   /** 単語の下に番号（トークンID）を出すか */
   const showId = content.showTokenId ?? true;
+
+  // 画面ごとの音声。phase が変わると前の画面の音は止まり、次の音に切り替わる
+  useAudio(content.screenAudio?.[phase]);
 
   const run = async () => {
     const t = text.trim();
