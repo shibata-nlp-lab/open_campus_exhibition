@@ -120,12 +120,9 @@ export default function ControllerApp() {
         <button className="btn lg" onClick={() => api.playback.send({ type: 'prev' })} disabled={state.index === 0}>
           ◀ 前へ
         </button>
-        <button
-          className="btn lg primary"
-          onClick={() => api.playback.send({ type: 'next' })}
-          disabled={state.index >= state.total - 1}
-        >
-          次へ ▶
+        {/* 最後まで行っていても押せる。そのときは待機画面に移る */}
+        <button className="btn lg primary" onClick={() => api.playback.send({ type: 'next' })}>
+          {state.index >= state.total - 1 ? '待機画面へ ▶' : '次へ ▶'}
         </button>
         <button className="btn lg" onClick={() => api.playback.send({ type: 'restart' })}>
           ⟲ 最初から

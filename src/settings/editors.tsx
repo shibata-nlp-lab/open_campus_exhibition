@@ -15,6 +15,7 @@ import type {
 import { uid } from '../defaults';
 import { api, errText } from '../lib/api';
 import { AssetPicker, Field, NumberField, Toggle } from './common';
+import { shiftIndex } from '../lib/reorder';
 
 type Patch<T> = (fn: (c: T) => void) => void;
 
@@ -278,14 +279,6 @@ function useDragReorder(onReorder: (from: number, to: number) => void) {
   });
 
   return { rowProps, handleProps, dragging: from !== null };
-}
-
-/** 並べ替えたときに「正解」が同じ選択肢を指し続けるように補正する */
-function shiftIndex(answer: number, from: number, to: number): number {
-  if (answer === from) return to;
-  if (from < answer && to >= answer) return answer - 1;
-  if (from > answer && to <= answer) return answer + 1;
-  return answer;
 }
 
 function QuizChoiceRow({
@@ -800,6 +793,92 @@ function Interactive2Editor({ c, patch }: { c: Interactive2Content; patch: Patch
 
 /* ---------------- ゲーム ---------------- */
 
+
+/** ゲームの候補1行。クイズと同じつまみで並べ替えできる */
+function GameChoiceRow({
+  round,
+  ri,
+  ci,
+  patch,
+  rowProps,
+  handleProps,
+}: {
+  round: GameContent['rounds'][number];
+  ri: number;
+  ci: number;
+  patch: Patch<GameContent>;
+  rowProps: (i: number) => Record<string, unknown>;
+  handleProps: (i: number, ref: React.RefObject<HTMLElement>) => Record<string, unknown>;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const ch = round.choices[ci];
+  const { className, ...rest } = rowProps(ci) as { className: string };
+  return (
+    <div ref={ref} className={`drag-row ${className}`} {...rest}>
+      <span className="drag-handle" title="ドラッグして並べ替え" {...handleProps(ci, ref)}>
+        ⠿
+      </span>
+      <input
+        type="radio"
+        name={`gans_${round.id}`}
+        checked={round.answerIndex === ci}
+        onChange={() => patch((x) => void (x.rounds[ri].answerIndex = ci))}
+        title="正解にする"
+      />
+      <input
+        className="input"
+        value={ch.text}
+        onChange={(e) => patch((x) => void (x.rounds[ri].choices[ci].text = e.target.value))}
+      />
+      <input
+        className="input"
+        style={{ width: 90 }}
+        type="number"
+        min={0}
+        max={1}
+        step={0.01}
+        value={ch.prob}
+        onChange={(e) => patch((x) => void (x.rounds[ri].choices[ci].prob = Number(e.target.value)))}
+      />
+      <button
+        className="btn sm danger"
+        disabled={round.choices.length <= 2}
+        onClick={() =>
+          patch((x) => {
+            x.rounds[ri].choices.splice(ci, 1);
+            x.rounds[ri].answerIndex = Math.min(x.rounds[ri].answerIndex, x.rounds[ri].choices.length - 1);
+          })
+        }
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
+function GameChoiceList({ round, ri, patch }: { round: GameContent['rounds'][number]; ri: number; patch: Patch<GameContent> }) {
+  const { rowProps, handleProps } = useDragReorder((from, to) =>
+    patch((x) => {
+      const r = x.rounds[ri];
+      const [item] = r.choices.splice(from, 1);
+      r.choices.splice(to, 0, item);
+      // 並べ替えても「正解」は同じ候補を指し続ける
+      r.answerIndex = shiftIndex(r.answerIndex, from, to);
+    })
+  );
+
+  return (
+    <div className="col" style={{ gap: 6 }}>
+      {round.choices.map((_, ci) => (
+        <GameChoiceRow key={ci} round={round} ri={ri} ci={ci} patch={patch} rowProps={rowProps} handleProps={handleProps} />
+      ))}
+      <button className="btn sm" onClick={() => patch((x) => void x.rounds[ri].choices.push({ text: '', prob: 0 }))}>
+        ＋ 候補
+      </button>
+    </div>
+  );
+}
+
 function GameEditor({ c, patch }: { c: GameContent; patch: Patch<GameContent> }) {
   return (
     <>
@@ -826,42 +905,8 @@ function GameEditor({ c, patch }: { c: GameContent; patch: Patch<GameContent> })
             <Field label="文脈（この続きの単語を当てさせる）" hint="進行画面では「文脈 ___」の形で表示されます。">
               <input className="input" value={r.context} onChange={(e) => patch((x) => void (x.rounds[ri].context = e.target.value))} />
             </Field>
-            <Field label="候補（ラジオで正解 / 数値は表示用の確率）">
-              <div className="col" style={{ gap: 6 }}>
-                {r.choices.map((ch, ci) => (
-                  <div className="row" key={ci}>
-                    <input
-                      type="radio"
-                      name={`gans_${r.id}`}
-                      checked={r.answerIndex === ci}
-                      onChange={() => patch((x) => void (x.rounds[ri].answerIndex = ci))}
-                    />
-                    <input
-                      className="input"
-                      value={ch.text}
-                      onChange={(e) => patch((x) => void (x.rounds[ri].choices[ci].text = e.target.value))}
-                    />
-                    <input
-                      className="input"
-                      style={{ width: 90 }}
-                      type="number" min={0} max={1} step={0.01}
-                      value={ch.prob}
-                      onChange={(e) => patch((x) => void (x.rounds[ri].choices[ci].prob = Number(e.target.value)))}
-                    />
-                    <button
-                      className="btn sm danger"
-                      disabled={r.choices.length <= 2}
-                      onClick={() => patch((x) => {
-                        x.rounds[ri].choices.splice(ci, 1);
-                        if (x.rounds[ri].answerIndex >= x.rounds[ri].choices.length) x.rounds[ri].answerIndex = 0;
-                      })}
-                    >✕</button>
-                  </div>
-                ))}
-                <button className="btn sm" onClick={() => patch((x) => void x.rounds[ri].choices.push({ text: '', prob: 0 }))}>
-                  ＋ 候補
-                </button>
-              </div>
+            <Field label="候補（ラジオで正解 / 数値は表示用の確率）" hint="⠿ をドラッグすると並べ替えられます。正解の指定は候補についていくので、並べ替えてもずれません。">
+              <GameChoiceList round={r} ri={ri} patch={patch} />
             </Field>
             <Field label="解説">
               <textarea className="textarea" value={r.explanation} onChange={(e) => patch((x) => void (x.rounds[ri].explanation = e.target.value))} />
