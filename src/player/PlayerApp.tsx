@@ -84,7 +84,15 @@ export default function PlayerApp({
     [steps.length]
   );
 
-  const next = useCallback(() => goto(index + 1), [goto, index]);
+  /**
+   * 次へ。**最後まで行ったら待機画面に移る**。
+   * 展示はこの繰り返しで回すので、終わったら黙って止まるより待機画面に出たほうが自然
+   * （そこからコントローラのシナリオ切替で次の回に入る）。
+   */
+  const next = useCallback(() => {
+    if (index >= steps.length - 1) return setStandby(true);
+    goto(index + 1);
+  }, [goto, index, steps.length]);
   const prev = useCallback(() => goto(index - 1), [goto, index]);
   const restart = useCallback(() => {
     setIndex(0);
@@ -215,7 +223,8 @@ export default function PlayerApp({
   const stepProps: StepProps = {
     content,
     config,
-    onFinish: () => (isLast ? restart() : next()),
+    // 最後のコンテンツで「次へ」を押したときも同じ（待機画面へ）
+    onFinish: next,
     record: (kind, payload) => {
       api.results.append({
         ts: new Date().toISOString(),
@@ -278,7 +287,8 @@ export default function PlayerApp({
         {!hasController && (
           <>
             <button className="btn sm ghost" onClick={prev} disabled={index === 0}>◀</button>
-            <button className="btn sm ghost" onClick={next} disabled={isLast}>▶</button>
+            {/* 最後でも押せる。押すと待機画面に移る */}
+            <button className="btn sm ghost" onClick={next} title={isLast ? '待機画面へ' : '次へ'}>▶</button>
           </>
         )}
       </div>
