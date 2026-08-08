@@ -34,6 +34,7 @@ import { canOpenTab } from '../src/permissions';
 import { embed, nextTokenCandidates, verifyKey } from './openai';
 import { embedLocal, isModelReady, prepareModel, RURI_MODELS, tokenizeRuri, type RuriSize } from './localEmbed';
 import { embedLlmJpIds, isLlmJpReady, LLMJP_MODELS, prepareLlmJpEmbed, type LlmJpSize } from './llmjpEmbed';
+import { isLlmJpNextReady, LLMJP_NEXT_MODEL, nextTokensLlmJp, prepareLlmJpNext } from './llmjpNext';
 import type { ApiResult, AppConfig, ClearResult, DisplayInfo, PlaybackCommand, PlaybackState, Role } from '../src/types';
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
@@ -443,6 +444,13 @@ function registerIpc() {
   ipcMain.handle('llmjp:prepare', (_e, size: LlmJpSize) => asResult(() => prepareLlmJpEmbed(size)));
   ipcMain.handle('llmjp:embed', (_e, args: { groups: number[][]; size: LlmJpSize }) =>
     asResult(async () => embedLlmJpIds(args.groups, args.size))
+  );
+
+  /* --- llm-jp 本体で次トークンを予測（体験②のオフライン版） --- */
+  ipcMain.handle('llmjp:nextStatus', () => ({ ...LLMJP_NEXT_MODEL, ready: isLlmJpNextReady() }));
+  ipcMain.handle('llmjp:prepareNext', () => asResult(() => prepareLlmJpNext()));
+  ipcMain.handle('llmjp:nextTokens', (_e, args: { text: string; topK: number }) =>
+    asResult(() => nextTokensLlmJp(args.text, args.topK))
   );
 
   /* --- ウィンドウ / ディスプレイ --- */

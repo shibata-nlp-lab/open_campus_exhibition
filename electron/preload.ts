@@ -85,6 +85,12 @@ const api = {
     prepare: (size: string): Promise<{ ready: boolean }> => unwrap(ipcRenderer.invoke('llmjp:prepare', size)),
     embed: (groups: number[][], size: string): Promise<number[][]> =>
       unwrap(ipcRenderer.invoke('llmjp:embed', { groups, size })),
+    /** 体験②用。こちらはモデル本体を動かして「次の1語」の確率を出す */
+    nextStatus: (): Promise<{ repo: string; label: string; mb: number; ready: boolean }> =>
+      ipcRenderer.invoke('llmjp:nextStatus'),
+    prepareNext: (): Promise<{ ready: boolean }> => unwrap(ipcRenderer.invoke('llmjp:prepareNext')),
+    nextTokens: (text: string, topK: number): Promise<TokenCandidate[]> =>
+      unwrap(ipcRenderer.invoke('llmjp:nextTokens', { text, topK })),
   },
   player: {
     /** standby: true で待機画面を出した状態から始める（本編はコントローラから選ぶ） */

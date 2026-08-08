@@ -47,12 +47,21 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
     };
   }, []);
 
+  // llm-jp は初回だけモデルの読み込み（キャッシュ済みで 0.5 秒ほど、未取得ならダウンロード）が
+  // 入る。来場者が入力している間に済ませておく
+  useEffect(() => {
+    if (content.predictSource === 'llmjp') api.llmjp.prepareNext().catch(() => {});
+  }, [content.predictSource]);
+
   const fetchCands = useCallback(
     async (current: string) => {
       setBusy(true);
       setError(null);
       try {
-        const c = await api.openai.nextTokens(current, content.topK, config.settings.chatModel);
+        const c =
+          content.predictSource === 'llmjp'
+            ? await api.llmjp.nextTokens(current, content.topK)
+            : await api.openai.nextTokens(current, content.topK, config.settings.chatModel);
         if (!alive.current) return;
         setCands(c);
         setOffline(false);
@@ -65,7 +74,7 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
         if (alive.current) setBusy(false);
       }
     },
-    [content.topK, config.settings.chatModel]
+    [content.topK, content.predictSource, config.settings.chatModel]
   );
 
   const start = async () => {

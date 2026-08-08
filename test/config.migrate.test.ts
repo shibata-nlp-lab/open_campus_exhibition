@@ -108,6 +108,18 @@ describe('migrate — 新しく増えたフィールドの補完', () => {
     expect(Object.keys((cfg.contents[0] as Interactive2Content).screenAudio).sort()).toEqual(['input', 'predict']);
   });
 
+  it('体験②の予測の取得元は、既存の設定では OpenAI のまま（勝手にローカルへ切り替えない）', () => {
+    const cfg = migrate(base({ contents: [{ id: 'c1', type: 'interactive2', name: '体験' } as never] }));
+    expect((cfg.contents[0] as Interactive2Content).predictSource).toBe('openai');
+  });
+
+  it('体験②で llm-jp を選んでいれば、そのまま残す', () => {
+    const cfg = migrate(
+      base({ contents: [{ id: 'c1', type: 'interactive2', name: '体験', predictSource: 'llmjp' } as never] })
+    );
+    expect((cfg.contents[0] as Interactive2Content).predictSource).toBe('llmjp');
+  });
+
   it('設定済みの画面の音声は残したまま、足りない画面だけ足す', () => {
     // 途中のバージョンで一部の画面にだけ音を入れた config を想定
     const cfg = migrate(

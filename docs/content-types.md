@@ -171,11 +171,14 @@ PDF は pdfjs-dist でページ送りします。`autoAdvanceSec` は markdown /
 
 ### interactive1 / interactive2
 
-唯一ネットワークを使う 2 つです。どちらも**失敗したらオフライン用の縮退動作に落ちて、
+ネットワークを使うことがある 2 つです。どちらも**失敗したらオフライン用の縮退動作に落ちて、
 展示は止まりません**（画面にその旨を明示します）。
+どちらもローカルのモデルを選べば通信なしで動きます（体験①は Ruri / llm-jp の埋め込み層、
+体験②は llm-jp-3 本体）。
 
 - interactive1 … 入力文をトークン分割 → ベクトル化 → 近いことば・ヒートマップ・PCA 2D
-- interactive2 … 次トークンの候補と確率を `top_logprobs` で出し、来場者が選んで文を伸ばす
+- interactive2 … 次トークンの候補と確率を出し、来場者が選んで文を伸ばす。
+  取得元（`predictSource`）は OpenAI の `top_logprobs` か、**この PC で動かす llm-jp-3-150m** の 2 通り
 
 トークナイザと埋め込みの選択肢は [nlp.md](nlp.md) にまとめています。
 
