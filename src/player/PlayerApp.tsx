@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppConfig, Content, ResultRecord, StandbyContent } from '../types';
 import { api } from '../lib/api';
+import { findBranchTarget } from '../lib/branch';
 import VideoStep from './VideoStep';
 import SlideStep from './SlideStep';
 import QuizStep from './QuizStep';
@@ -8,6 +9,7 @@ import Interactive1Step from './Interactive1Step';
 import Interactive2Step from './Interactive2Step';
 import GameStep from './GameStep';
 import SurveyStep from './SurveyStep';
+import BranchStep from './BranchStep';
 import StandbyStep, { StandbyView } from './StandbyStep';
 
 export interface StepProps<T extends Content = Content> {
@@ -84,9 +86,27 @@ export default function PlayerApp({
     [steps.length]
   );
 
-  const next = useCallback(() => goto(index + 1), [goto, index]);
-  const prev = useCallback(() => goto(index - 1), [goto, index]);
+  /**
+   * 分岐画面（branch）から体験へ飛んだときの帰り先。
+   * 体験を終えて「次へ」を押すと、次のコンテンツではなくここへ戻す。
+   */
+  const [returnTo, setReturnTo] = useState<number | null>(null);
+
+  const next = useCallback(() => {
+    if (returnTo !== null) {
+      setReturnTo(null);
+      return goto(returnTo);
+    }
+    goto(index + 1);
+  }, [goto, index, returnTo]);
+  // 送り以外の移動は「帰る約束」を破棄する。進行係が手で動かしたあとに
+  // 意図しない場所へ飛ぶほうが混乱するため
+  const prev = useCallback(() => {
+    setReturnTo(null);
+    goto(index - 1);
+  }, [goto, index]);
   const restart = useCallback(() => {
+    setReturnTo(null);
     setIndex(0);
     setRunKey((k) => k + 1);
     setDetail(null);
@@ -115,9 +135,13 @@ export default function PlayerApp({
     return api.playback.onCommand((cmd) => {
       if (cmd.type === 'next') next();
       else if (cmd.type === 'prev') prev();
-      else if (cmd.type === 'goto') goto(cmd.index);
+      else if (cmd.type === 'goto') {
+        setReturnTo(null);
+        goto(cmd.index);
+      }
       else if (cmd.type === 'scenario') {
         // 待機画面から本編へ入る導線。最初から始めて待機は解除する
+        setReturnTo(null);
         setCurrentId(cmd.id);
         setIndex(0);
         setRunKey((k) => k + 1);
@@ -188,12 +212,24 @@ export default function PlayerApp({
         mode: effectiveStandby.nextStartMode ?? 'hidden',
         time: effectiveStandby.nextStartTime ?? '',
       },
+      returnTo,
     };
     const json = JSON.stringify(state);
     if (json === publishedRef.current) return;
     publishedRef.current = json;
     api.playback.publish(state);
-  }, [config, scenario, index, steps, detail, standby, standbyAudioAvailable, standbyMuted, effectiveStandby]);
+  }, [
+    config,
+    scenario,
+    index,
+    steps,
+    detail,
+    standby,
+    standbyAudioAvailable,
+    standbyMuted,
+    effectiveStandby,
+    returnTo,
+  ]);
 
   if (!config) return <div className="player" />;
 
@@ -215,7 +251,8 @@ export default function PlayerApp({
   const stepProps: StepProps = {
     content,
     config,
-    onFinish: () => (isLast ? restart() : next()),
+    // 帰る約束があるときは、最後のコンテンツであっても最初に戻さず分岐画面へ帰す
+    onFinish: () => (returnTo === null && isLast ? restart() : next()),
     record: (kind, payload) => {
       api.results.append({
         ts: new Date().toISOString(),
@@ -238,6 +275,23 @@ export default function PlayerApp({
       case 'interactive2': return <Interactive2Step {...(stepProps as StepProps<typeof content>)} />;
       case 'game': return <GameStep {...(stepProps as StepProps<typeof content>)} />;
       case 'survey': return <SurveyStep {...(stepProps as StepProps<typeof content>)} />;
+      case 'branch': {
+        const target = findBranchTarget(
+          steps.map((c) => c.id),
+          index,
+          content.targetContentId
+        );
+        return (
+          <BranchStep
+            {...(stepProps as StepProps<typeof content>)}
+            targetIndex={target}
+            onJump={() => {
+              setReturnTo(index);
+              goto(target);
+            }}
+          />
+        );
+      }
       case 'standby':
         return (
           <StandbyStep

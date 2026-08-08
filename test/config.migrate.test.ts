@@ -72,6 +72,11 @@ describe('migrate — 廃止された種別の掃除', () => {
     const cfg = migrate(base({ contents: [{ id: 'c1', type: 'quiz', name: 'クイズ', questions: [] } as never] }));
     expect(cfg.contents).toHaveLength(1);
   });
+
+  it('分岐（体験に戻る）を消さない — known に入れ忘れると次の起動で消える', () => {
+    const cfg = migrate(base({ contents: [{ id: 'c1', type: 'branch', name: '体験に戻る' } as never] }));
+    expect(cfg.contents).toHaveLength(1);
+  });
 });
 
 describe('migrate — 新しく増えたフィールドの補完', () => {

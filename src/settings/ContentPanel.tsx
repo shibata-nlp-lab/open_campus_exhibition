@@ -125,7 +125,8 @@ export default function ContentPanel({ config, update }: PanelProps) {
 
             <hr style={{ border: 0, borderTop: '1px solid var(--line)', margin: '16px 0' }} />
 
-            <ContentEditor content={content} patch={patch} />
+            {/* 分岐（体験に戻る）は戻り先を他のコンテンツから選ぶので、一覧を渡す */}
+            <ContentEditor content={content} patch={patch} contents={config.contents} />
 
             <div className="small muted" style={{ marginTop: 16 }}>
               使用中のシナリオ: {usedIn(content.id).join(' / ') || 'なし'}

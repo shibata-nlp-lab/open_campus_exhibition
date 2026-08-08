@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import type {
   AudioSetting,
+  BranchContent,
   Content,
   GameContent,
   Interactive1Content,
@@ -12,7 +13,7 @@ import type {
   SurveyContent,
   VideoContent,
 } from '../types';
-import { emptyAudio, uid } from '../defaults';
+import { CONTENT_LABELS, emptyAudio, uid } from '../defaults';
 import { api, errText } from '../lib/api';
 import { AssetPicker, Field, NumberField, Toggle } from './common';
 
@@ -1054,9 +1055,92 @@ function StandbyEditor({ c, patch }: { c: StandbyContent; patch: Patch<StandbyCo
   );
 }
 
+/* ---------------- 分岐（体験に戻る） ---------------- */
+
+function BranchEditor({
+  c,
+  patch,
+  contents,
+}: {
+  c: BranchContent;
+  patch: Patch<BranchContent>;
+  contents: Content[];
+}) {
+  // 戻り先は体験・ゲームを想定しているが、スライドに戻したい場合もあるので
+  // 分岐そのものと待機画面以外は選べるようにしておく
+  const targets = contents.filter((x) => x.type !== 'branch' && x.type !== 'standby');
+  return (
+    <>
+      <div className="banner warn" style={{ marginBottom: 14 }}>
+        説明のあとに置いて「体験したい人だけ」を前の体験に戻す画面です。
+        戻った先で「次へすすむ」を押すと、次のコンテンツではなく<strong>この画面に帰ってきます</strong>。
+        そこで「{c.stayLabel || 'ここで終わる'}」を選ぶと先へ進みます。
+      </div>
+      <Field label="見出し">
+        <input className="input" value={c.message} onChange={(e) => patch((x) => void (x.message = e.target.value))} />
+      </Field>
+      <Field label="補足">
+        <input
+          className="input"
+          value={c.submessage}
+          onChange={(e) => patch((x) => void (x.submessage = e.target.value))}
+        />
+      </Field>
+      <Field
+        label="戻る先のコンテンツ"
+        hint="同じシナリオの中に、この分岐より前に置いてあるものを選んでください。シナリオに入っていないと戻るボタンは出ません。"
+      >
+        <select
+          className="select"
+          value={c.targetContentId ?? ''}
+          onChange={(e) => patch((x) => void (x.targetContentId = e.target.value || null))}
+        >
+          <option value="">（選択なし）</option>
+          {targets.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}（{CONTENT_LABELS[t.type]}）
+            </option>
+          ))}
+        </select>
+      </Field>
+      {!c.targetContentId && (
+        <div className="small muted" style={{ marginTop: -6, marginBottom: 12 }}>
+          戻り先が未設定のあいだは、進行画面には「{c.stayLabel || 'ここで終わる'}」だけが出ます。
+        </div>
+      )}
+      <div className="row">
+        <div style={{ flex: 1 }}>
+          <Field label="戻るボタンの文言">
+            <input className="input" value={c.goLabel} onChange={(e) => patch((x) => void (x.goLabel = e.target.value))} />
+          </Field>
+        </div>
+        <div style={{ flex: 1 }}>
+          <Field label="進むボタンの文言">
+            <input
+              className="input"
+              value={c.stayLabel}
+              onChange={(e) => patch((x) => void (x.stayLabel = e.target.value))}
+            />
+          </Field>
+        </div>
+      </div>
+      <AudioFields audio={c.audio} patch={(fn) => patch((x) => fn(x.audio))} />
+    </>
+  );
+}
+
 /* ---------------- ディスパッチャ ---------------- */
 
-export function ContentEditor({ content, patch }: { content: Content; patch: Patch<Content> }) {
+export function ContentEditor({
+  content,
+  patch,
+  contents = [],
+}: {
+  content: Content;
+  patch: Patch<Content>;
+  /** 他のコンテンツを参照する種別（分岐）のための一覧 */
+  contents?: Content[];
+}) {
   switch (content.type) {
     case 'video':
       return <VideoEditor c={content} patch={patch as Patch<VideoContent>} />;
@@ -1072,6 +1156,14 @@ export function ContentEditor({ content, patch }: { content: Content; patch: Pat
       return <GameEditor c={content} patch={patch as Patch<GameContent>} />;
     case 'survey':
       return <SurveyEditor c={content} patch={patch as Patch<SurveyContent>} />;
+    case 'branch':
+      return (
+        <BranchEditor
+          c={content}
+          patch={patch as Patch<BranchContent>}
+          contents={contents.filter((x) => x.id !== content.id)}
+        />
+      );
     case 'standby':
       return <StandbyEditor c={content} patch={patch as Patch<StandbyContent>} />;
   }

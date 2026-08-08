@@ -1,6 +1,7 @@
 import type {
   AppConfig,
   AudioSetting,
+  BranchContent,
   Content,
   ContentType,
   GameContent,
@@ -63,6 +64,7 @@ export const CONTENT_LABELS: Record<ContentType, string> = {
   interactive2: 'インタラクティブ2（次単語予測）',
   game: 'ゲーム（次の単語当て）',
   survey: 'アンケート',
+  branch: '分岐（体験に戻る）',
   standby: '待機画面',
 };
 
@@ -169,6 +171,17 @@ export function createContent(type: ContentType): Content {
         defaultPeople: 1,
         audio: emptyAudio(),
       } as SurveyContent;
+    case 'branch':
+      return {
+        ...base,
+        type,
+        message: '実際に体験してみますか？',
+        submessage: '体験したい人は「体験する」を選んでください',
+        targetContentId: null,
+        goLabel: '体験する ▶',
+        stayLabel: 'ここで終わる',
+        audio: emptyAudio(),
+      } as BranchContent;
     case 'standby':
       return {
         ...base,

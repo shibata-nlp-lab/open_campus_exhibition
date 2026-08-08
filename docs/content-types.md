@@ -1,6 +1,6 @@
 # コンテンツ種別
 
-コンテンツは展示の部品です。8 種類あり、`type` フィールドで判別する判別可能ユニオン
+コンテンツは展示の部品です。9 種類あり、`type` フィールドで判別する判別可能ユニオン
 （[src/types.ts](../src/types.ts) の `Content`）になっています。
 
 ```
@@ -16,6 +16,7 @@ type ──▶ 型 ──────────────────▶ 描
 | `interactive2` | `Interactive2Content` | [Interactive2Step](../src/player/Interactive2Step.tsx) | **要**（縮退あり） | — |
 | `game` | `GameContent` | [GameStep](../src/player/GameStep.tsx) | 不要 | `game` |
 | `survey` | `SurveyContent` | [SurveyStep](../src/player/SurveyStep.tsx) | 不要 | `survey` |
+| `branch` | `BranchContent` | [BranchStep](../src/player/BranchStep.tsx) | 不要 | — |
 | `standby` | `StandbyContent` | [StandbyStep](../src/player/StandbyStep.tsx) | 不要 | — |
 
 共通フィールドは `ContentBase` です。`note` は**コントローラにだけ**出る進行用の覚え書きで、
@@ -100,6 +101,37 @@ PDF は pdfjs-dist でページ送りします。`autoAdvanceSec` は markdown /
 来場者ではなく**その場の人数を数えて入れる**設計です。`people`（人数）を ＋/− で変えながら、
 選択肢ごとに人数を積みます。`kind` が `scale` の設問は 1..5 固定。
 1 グループ分をまとめて 1 行として記録します。
+
+### branch
+
+**説明が終わったあと、体験したい人だけを前の体験へ戻す**ための分かれ道です。
+説明の途中で体験を挟むと全員が待たされるので、希望者だけが進む出口をシナリオの終盤に置けるようにしています。
+
+```
+… → 説明スライド → ［体験してみますか？］ ──「体験する」──▶ 体験①
+                          ▲                                      │
+                          └────────── 体験の「次へすすむ」 ────────┘
+                          │
+                     「ここで終わる」 → 次のコンテンツ（待機画面など）
+```
+
+シナリオの並びとしては**一本道のまま**で、行き来はステップ番号のジャンプで実現しています。
+
+- `targetContentId` … 戻る先のコンテンツ。**この分岐より前にあるもの**を優先して探し、
+  前に無ければ後ろも見ます（[src/lib/branch.ts](../src/lib/branch.ts) の `findBranchTarget()`）。
+  同じ体験が 2 か所にあるときは直前に見せたほうへ帰します
+- シナリオ内に見つからないときは**戻るボタンを出しません**。押しても何も起きない状態が
+  展示中はいちばん困るためです
+- 戻り先が自分自身になる指定は無効です（抜けられなくなるため）
+
+戻っている間、[PlayerApp](../src/player/PlayerApp.tsx) は帰り先を `returnTo` で覚えています。
+このとき「次へ」は**次のコンテンツではなく分岐画面へ帰り**ます（`N` キー・コントローラ・
+体験側の「次へすすむ」すべて同じ）。「前へ」「最初から」「ステップ直接指定」「シナリオ切替」は
+`returnTo` を捨てます — 進行係が手で動かしたあとに意図しない場所へ飛ぶほうが混乱するためです。
+
+`returnTo` は `PlaybackState` にも載せていて、コントローラには
+「↩ 体験に戻っています — 「次へ」で〜に帰ります」と出ます。戻った理由が分からないまま
+画面が前に戻ったように見えるのを避けるためです。
 
 ### standby
 

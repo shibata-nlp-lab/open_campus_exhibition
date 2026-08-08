@@ -88,6 +88,8 @@ export default function ControllerApp() {
   const current = state.steps[state.index];
   const bgmOn = Boolean(state.standbyAudio?.available) && !state.standbyAudio?.muted;
   const upcoming = state.steps[state.index + 1];
+  /** 分岐画面から体験へ飛んでいる間の帰り先（飛んでいなければ undefined） */
+  const returning = state.returnTo != null ? state.steps[state.returnTo] : undefined;
 
   return (
     <div className="controller">
@@ -112,8 +114,16 @@ export default function ControllerApp() {
       {current?.note && <div className="ctrl-note">📝 {current.note}</div>}
 
       <div className="ctrl-next small muted">
-        次のコンテンツ：{upcoming ? `${upcoming.name}（${CONTENT_LABELS[upcoming.type]}）` : '（これが最後です）'}
-        {upcoming?.note ? ` / メモ：${upcoming.note}` : ''}
+        {returning ? (
+          // 分岐画面から飛んできている間は、順番どおりの「次」ではなく分岐画面に帰る。
+          // 何も出さないと進行係には戻る理由が分からないので、ここで理由ごと出す
+          <>↩ 体験に戻っています — 「次へ」で「{returning.name}」に帰ります</>
+        ) : (
+          <>
+            次のコンテンツ：{upcoming ? `${upcoming.name}（${CONTENT_LABELS[upcoming.type]}）` : '（これが最後です）'}
+            {upcoming?.note ? ` / メモ：${upcoming.note}` : ''}
+          </>
+        )}
       </div>
 
       <div className="ctrl-buttons">
@@ -123,9 +133,10 @@ export default function ControllerApp() {
         <button
           className="btn lg primary"
           onClick={() => api.playback.send({ type: 'next' })}
-          disabled={state.index >= state.total - 1}
+          // 帰り先があるときは、最後のコンテンツにいても「次へ」で分岐画面に帰れる
+          disabled={state.index >= state.total - 1 && !returning}
         >
-          次へ ▶
+          {returning ? '体験を終える ▶' : '次へ ▶'}
         </button>
         <button className="btn lg" onClick={() => api.playback.send({ type: 'restart' })}>
           ⟲ 最初から
