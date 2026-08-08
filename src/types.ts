@@ -123,6 +123,17 @@ export type LlmJpSize = '150m' | '440m' | '1.8b';
  */
 export type SimilarityDisplay = 'relative' | 'cosine';
 
+/**
+ * 体験①の画面。音声を画面ごとに差し替えるために使う。
+ * - input:   入力画面（トークン化する前）
+ * - tokens:  単語分割の結果
+ * - vectors: ベクトル化の結果
+ */
+export type Interactive1Phase = 'input' | 'tokens' | 'vectors';
+
+/** 体験②の画面。input: 入力画面 / predict: 予測を回している画面 */
+export type Interactive2Phase = 'input' | 'predict';
+
 export interface Interactive1Content extends ContentBase {
   type: 'interactive1';
   prompt: string;
@@ -137,6 +148,11 @@ export interface Interactive1Content extends ContentBase {
   similarityDisplay: SimilarityDisplay;
   /** 単語の下に ID を出すか（来場者向けには不要なことが多い） */
   showTokenId: boolean;
+  /**
+   * 画面ごとの音声。src が空の画面では何も鳴らさない。
+   * 画面が切り替わると前の画面の音は止まる（重なって鳴らない）。
+   */
+  screenAudio: Record<Interactive1Phase, AudioSetting>;
 }
 
 export interface Interactive2Content extends ContentBase {
@@ -150,6 +166,8 @@ export interface Interactive2Content extends ContentBase {
   maxSteps: number;
   /** true: 常に1位を選ぶ / false: 来場者が選ぶ */
   autoPickTop: boolean;
+  /** 画面ごとの音声。体験①と同じ扱い */
+  screenAudio: Record<Interactive2Phase, AudioSetting>;
 }
 
 export interface GameChoice {

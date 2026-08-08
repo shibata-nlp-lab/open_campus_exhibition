@@ -2,7 +2,14 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { AppConfig, ResultRecord } from '../src/types';
-import { createDefaultConfig, DEFAULT_ATTRIBUTE_OPTIONS, mergeSamples, SAMPLES_VERSION } from '../src/defaults';
+import {
+  createDefaultConfig,
+  DEFAULT_ATTRIBUTE_OPTIONS,
+  emptyInteractive1Audio,
+  emptyInteractive2Audio,
+  mergeSamples,
+  SAMPLES_VERSION,
+} from '../src/defaults';
 
 export const userDir = () => app.getPath('userData');
 export const assetsDir = () => path.join(userDir(), 'assets');
@@ -88,8 +95,13 @@ export function migrate(config: AppConfig): AppConfig {
       c.llmjpSize ??= '150m';
       c.similarityDisplay ??= 'relative';
       c.showTokenId ??= true;
+      // 画面ごとの音声。1つでも欠けていると再生時に落ちるので、キー単位で補う
+      c.screenAudio = { ...emptyInteractive1Audio(), ...(c.screenAudio ?? {}) };
       // 初期文言の言い換え。手を入れていないものだけ差し替える
       if (c.prompt === '好きな文章を入力してみよう') c.prompt = '好きな文を入力してみよう';
+    }
+    if (c.type === 'interactive2') {
+      c.screenAudio = { ...emptyInteractive2Audio(), ...(c.screenAudio ?? {}) };
     }
     if (c.type === 'standby') {
       c.nextStartMode ??= 'hidden';

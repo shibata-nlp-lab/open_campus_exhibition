@@ -3,6 +3,7 @@ import type { Interactive2Content, TokenCandidate } from '../types';
 import type { StepProps } from './PlayerApp';
 import { api, errText } from '../lib/api';
 import { isSubmitEnter } from '../lib/ime';
+import { useAudio } from './useAudio';
 
 /** API が使えないときの簡易候補（デモ継続用） */
 function offlineCandidates(text: string, topK: number): TokenCandidate[] {
@@ -33,6 +34,9 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const alive = useRef(true);
+
+  // 画面ごとの音声（入力画面／予測画面）。切り替わると前の画面の音は止まる
+  useAudio(content.screenAudio?.[started ? 'predict' : 'input']);
 
   // StrictMode（開発時）は mount → cleanup → 再 mount するため、
   // 立ち上がりで必ず true に戻さないとフラグが false のままになり応答を捨て続ける

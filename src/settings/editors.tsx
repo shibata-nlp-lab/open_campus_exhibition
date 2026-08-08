@@ -12,7 +12,7 @@ import type {
   SurveyContent,
   VideoContent,
 } from '../types';
-import { uid } from '../defaults';
+import { emptyAudio, uid } from '../defaults';
 import { api, errText } from '../lib/api';
 import { AssetPicker, Field, NumberField, Toggle } from './common';
 import { shiftIndex } from '../lib/reorder';
@@ -25,15 +25,18 @@ function AudioFields({
   audio,
   patch,
   alwaysLoop = false,
+  title = 'この最中に流す音声',
 }: {
   audio: AudioSetting;
   patch: (fn: (a: AudioSetting) => void) => void;
   /** 待機画面のように必ずループさせるものは、トグルを出さず説明だけにする */
   alwaysLoop?: boolean;
+  /** 画面ごとに複数並べるときの見出し */
+  title?: string;
 }) {
   return (
     <div className="card" style={{ marginBottom: 14 }}>
-      <div className="small muted" style={{ marginBottom: 8 }}>この最中に流す音声</div>
+      <div className="small muted" style={{ marginBottom: 8 }}>{title}</div>
       <AssetPicker
         label="音声ファイル"
         value={audio.src}
@@ -60,6 +63,45 @@ function AudioFields({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * 体験①/② の「画面ごとの音声」。
+ * 1つのコンテンツの中で画面が切り替わるので、コンテンツ全体に1つ付ける他の種別と違い
+ * 画面の数だけ並べる。ナレーションを想定しているので既定ではループしない。
+ */
+function ScreenAudioFields<T extends Interactive1Content | Interactive2Content>({
+  c,
+  patch,
+  screens,
+}: {
+  c: T;
+  patch: Patch<T>;
+  screens: Array<{ key: string; label: string }>;
+}) {
+  type Screens = T['screenAudio'];
+  return (
+    <>
+      <div className="small muted" style={{ margin: '18px 0 8px' }}>
+        画面ごとの音声 — 画面が切り替わると前の音は止まります。使わない画面は空のままにしてください。
+      </div>
+      {screens.map((s) => (
+        <AudioFields
+          key={s.key}
+          title={s.label}
+          audio={(c.screenAudio as Record<string, AudioSetting> | undefined)?.[s.key] ?? emptyAudio()}
+          patch={(fn) =>
+            patch((x) => {
+              // 古い config には screenAudio が無いことがあるので、触る直前に補う
+              const all = ((x.screenAudio ??= {} as Screens) as unknown) as Record<string, AudioSetting>;
+              all[s.key] ??= emptyAudio();
+              fn(all[s.key]);
+            })
+          }
+        />
+      ))}
+    </>
   );
 }
 
@@ -763,6 +805,16 @@ function Interactive1Editor({ c, patch }: { c: Interactive1Content; patch: Patch
           <option value="llmjp">llm-jp から抽出した日本語（頻度上位6,000語）</option>
         </select>
       </Field>
+
+      <ScreenAudioFields
+        c={c}
+        patch={patch}
+        screens={[
+          { key: 'input', label: '入力画面（単語に分ける前）' },
+          { key: 'tokens', label: 'STEP 1 — 単語分割の画面' },
+          { key: 'vectors', label: 'STEP 2 — ベクトル化の画面' },
+        ]}
+      />
     </>
   );
 }
@@ -786,6 +838,15 @@ function Interactive2Editor({ c, patch }: { c: Interactive2Content; patch: Patch
         label="常に確率1位を自動採用する（来場者が選ばない）"
         checked={c.autoPickTop}
         onChange={(v) => patch((x) => void (x.autoPickTop = v))}
+      />
+
+      <ScreenAudioFields
+        c={c}
+        patch={patch}
+        screens={[
+          { key: 'input', label: '入力画面（予測を始める前）' },
+          { key: 'predict', label: '予測中の画面' },
+        ]}
       />
     </>
   );

@@ -33,6 +33,17 @@ export const uid = (prefix = 'id') =>
 
 export const emptyAudio = (): AudioSetting => ({ src: null, volume: 0.6, loop: false });
 
+/** 体験①/② の画面ごとの音声（すべて未設定＝無音） */
+export const emptyInteractive1Audio = (): Interactive1Content['screenAudio'] => ({
+  input: emptyAudio(),
+  tokens: emptyAudio(),
+  vectors: emptyAudio(),
+});
+export const emptyInteractive2Audio = (): Interactive2Content['screenAudio'] => ({
+  input: emptyAudio(),
+  predict: emptyAudio(),
+});
+
 /** コントローラで来場者の内訳を記録するときの既定の区分 */
 export const DEFAULT_ATTRIBUTE_OPTIONS = [
   '高校1年',
@@ -108,6 +119,7 @@ export function createContent(type: ContentType): Content {
         llmjpSize: '150m',
         similarityDisplay: 'relative',
         showTokenId: true,
+        screenAudio: emptyInteractive1Audio(),
       } as Interactive1Content;
     case 'interactive2':
       return {
@@ -119,6 +131,7 @@ export function createContent(type: ContentType): Content {
         topK: 5,
         maxSteps: 12,
         autoPickTop: false,
+        screenAudio: emptyInteractive2Audio(),
       } as Interactive2Content;
     case 'game':
       return {
