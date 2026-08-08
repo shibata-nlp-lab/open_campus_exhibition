@@ -8,6 +8,7 @@ export type ContentType =
   | 'interactive2'
   | 'game'
   | 'survey'
+  | 'branch'
   | 'standby';
 
 export interface ContentBase {
@@ -211,6 +212,27 @@ export interface SurveyContent extends ContentBase {
   audio: AudioSetting;
 }
 
+/**
+ * 「体験してみますか？」の分かれ道。
+ * 説明が終わったあと、希望する人だけ前の体験コンテンツへ戻すために置く。
+ * 戻った先で「次へ」を押すと、次のコンテンツではなくこの画面に帰ってくる。
+ */
+export interface BranchContent extends ContentBase {
+  type: 'branch';
+  message: string;
+  submessage: string;
+  /**
+   * 「体験する」で戻る先のコンテンツ。
+   * シナリオ内に見つからないときはボタンを出さない（展示を止めないため）。
+   */
+  targetContentId: string | null;
+  /** 戻るほうのボタンの文言 */
+  goLabel: string;
+  /** 先へ進むほうのボタンの文言 */
+  stayLabel: string;
+  audio: AudioSetting;
+}
+
 /** 次の回の開始時刻の見せ方 */
 export type NextStartMode = 'hidden' | 'undecided' | 'time';
 
@@ -238,6 +260,7 @@ export type Content =
   | Interactive2Content
   | GameContent
   | SurveyContent
+  | BranchContent
   | StandbyContent;
 
 export interface ScenarioStep {
@@ -387,6 +410,11 @@ export interface PlaybackState {
   standbyAudio: { available: boolean; muted: boolean };
   /** いま効いている待機画面の「次の回のはじまり」（コントローラから編集するため） */
   standbyNext: { contentId: string; mode: NextStartMode; time: string };
+  /**
+   * 分岐画面から体験へ飛んでいるとき、次へ進むと帰る先のステップ番号。
+   * 進行係が「なぜ戻ったのか」を分かるように出す。飛んでいなければ null
+   */
+  returnTo: number | null;
 }
 
 export type PlaybackCommand =

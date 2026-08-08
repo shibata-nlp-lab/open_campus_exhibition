@@ -10,6 +10,7 @@ const TYPES: ContentType[] = [
   'interactive2',
   'game',
   'survey',
+  'branch',
   'standby',
 ];
 

@@ -79,6 +79,7 @@ export function migrate(config: AppConfig): AppConfig {
     'interactive2',
     'game',
     'survey',
+    'branch',
     'standby',
   ]);
   const removed = config.contents.filter((c) => !known.has(c.type)).map((c) => c.id);
