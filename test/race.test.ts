@@ -3,6 +3,7 @@ import {
   buildRaceCurve,
   finishPositions,
   movingAverage,
+  pickRaces,
   positionAt,
   ranksAt,
   standardizedLogits,
@@ -217,5 +218,47 @@ describe('コース', () => {
     const outer = laneOffset(p, 5, 7);
     const d = (q: { x: number; y: number }) => Math.hypot(q.x - shape.cx, q.y - shape.cy);
     expect(d(outer)).toBeGreaterThan(d(inner));
+  });
+});
+
+describe('その回に使うレースを選ぶ', () => {
+  const pool = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+
+  it('指定した数だけ返す', () => {
+    expect(pickRaces(pool, 5)).toHaveLength(5);
+  });
+
+  it('同じレースを2回入れない', () => {
+    for (let i = 0; i < 50; i++) {
+      const got = pickRaces(pool, 5);
+      expect(new Set(got).size).toBe(5);
+    }
+  });
+
+  it('登録が足りなければあるだけ返す', () => {
+    expect(pickRaces(['a', 'b'], 5)).toHaveLength(2);
+    expect(pickRaces([], 5)).toEqual([]);
+  });
+
+  it('元の配列を壊さない', () => {
+    const copy = pool.slice();
+    pickRaces(pool, 3);
+    expect(pool).toEqual(copy);
+  });
+
+  it('毎回同じ並びにならない（回ごとに違うレースになる）', () => {
+    const seen = new Set(Array.from({ length: 40 }, () => pickRaces(pool, 3).join(',')));
+    expect(seen.size).toBeGreaterThan(1);
+  });
+
+  it('どのレースも選ばれる可能性がある（後ろが死票にならない）', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 500; i++) for (const r of pickRaces(pool, 3)) seen.add(r);
+    expect(seen.size).toBe(pool.length);
+  });
+
+  it('乱数を渡せば結果が決まる（テストできる）', () => {
+    const fixed = () => 0;
+    expect(pickRaces(pool, 3, fixed)).toEqual(pickRaces(pool, 3, fixed));
   });
 });

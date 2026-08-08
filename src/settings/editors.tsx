@@ -1006,18 +1006,42 @@ function BettingEditor({ c, patch }: { c: BettingContent; patch: Patch<BettingCo
   const [notice, setNotice] = useState<string[]>([]);
   const race = c.races[Math.min(raceIdx, Math.max(0, c.races.length - 1))];
 
-  /** Colab が書き出した races.csv を取り込む */
+  /**
+   * ノートブックが書き出した races_NN.csv を取り込む。
+   * **1ファイル1レース**で何度も取り込む使い方なので、置き換えではなく**追加**する。
+   * 同じ race_id のものは新しいほうで差し替える（作り直したときに二重にならない）。
+   */
   const importCsv = async () => {
     const abs = await api.file.pick([{ name: 'CSV', extensions: ['csv'] }]);
     if (!abs) return;
     try {
       const { races, warnings } = parseRacesCsv(await api.file.readText(abs));
-      if (races.length) patch((x) => void (x.races = races));
+      const replaced = races.filter((r) => c.races.some((x) => x.id === r.id)).length;
+      if (races.length) {
+        patch((x) => {
+          const incoming = new Set(races.map((r) => r.id));
+          x.races = [...x.races.filter((r) => !incoming.has(r.id)), ...races];
+        });
+      }
       setRaceIdx(0);
-      setNotice(races.length ? [`${races.length} レースを取り込みました。`, ...warnings] : warnings);
+      setNotice(
+        races.length
+          ? [
+              `${races.length} レースを追加しました${replaced ? `（うち ${replaced} 件は同じ race_id なので差し替え）` : ''}。`,
+              ...warnings,
+            ]
+          : warnings
+      );
     } catch (e) {
       setNotice([errText(e)]);
     }
+  };
+
+  /** 選んでいるレースを消す */
+  const removeRace = () => {
+    patch((x) => void x.races.splice(raceIdx, 1));
+    setRaceIdx(0);
+    setNotice([]);
   };
 
   /** オッズのシードを振り直す（同じシードなら毎回同じオッズになるため） */
@@ -1040,8 +1064,10 @@ function BettingEditor({ c, patch }: { c: BettingContent; patch: Patch<BettingCo
       </div>
 
       <div className="row" style={{ marginBottom: 12 }}>
-        <button className="btn" onClick={importCsv}>races.csv を取り込む…</button>
-        <span className="small muted">{c.races.length} レース登録済み</span>
+        <button className="btn" onClick={importCsv}>races_NN.csv を取り込む…</button>
+        <span className="small muted">
+          {c.races.length} レース登録済み（本番は毎回この中から {c.raceCount} レースをランダムに選びます）
+        </span>
       </div>
       {notice.length > 0 && (
         <div className="banner" style={{ marginBottom: 12 }}>
@@ -1094,6 +1120,7 @@ function BettingEditor({ c, patch }: { c: BettingContent; patch: Patch<BettingCo
               ))}
             </select>
             <button className="btn sm" onClick={reseed}>オッズを引き直す</button>
+            <button className="btn sm" onClick={removeRace}>このレースを削除</button>
             <span className="small muted">
               「{race.prompt}」 {curve.distance}m
             </span>

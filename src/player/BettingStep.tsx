@@ -20,7 +20,7 @@ import {
   payout,
   raceOdds,
 } from '../lib/odds';
-import { buildRaceCurve, positionAt } from '../lib/race';
+import { buildRaceCurve, pickRaces, positionAt } from '../lib/race';
 import Track from './RaceTrack';
 
 type Phase = 'card' | 'race' | 'result' | 'over' | 'done';
@@ -30,8 +30,12 @@ const CHIPS = [100, 500, 1000, 5000, 10000];
 
 const yen = (n: number) => `${Math.round(n).toLocaleString('ja-JP')}円`;
 
-export default function BettingStep({ content, onFinish }: StepProps<BettingContent>) {
-  const races = content.races.slice(0, Math.max(1, content.raceCount));
+export default function BettingStep({ content, onFinish, runKey }: StepProps<BettingContent>) {
+  // 登録されたレースからその回のぶんを選び直す。R を押してやり直すと別の組み合わせになる
+  const races = useMemo(
+    () => pickRaces(content.races, Math.max(1, content.raceCount)),
+    [content.races, content.raceCount, runKey]
+  );
   const [index, setIndex] = useState(0);
   const [money, setMoney] = useState(content.startingMoney);
   const [phase, setPhase] = useState<Phase>('card');

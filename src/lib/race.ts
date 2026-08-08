@@ -138,6 +138,24 @@ export function positionAt(positions: number[], progress: number): number {
   return positions[i] + (positions[i + 1] - positions[i]) * (x - i);
 }
 
+/**
+ * 登録されたレースから、その回に使う分をランダムに選ぶ。
+ *
+ * ノートブックは 1 ファイル 1 レースで作るので、登録されたレースは溜まっていく。
+ * 毎回そこから選び直すことで、同じ展示でも回ごとに違うレースになる。
+ * 頭数が足りなければあるだけ返す。
+ */
+export function pickRaces<T>(races: T[], count: number, rnd: () => number = Math.random): T[] {
+  const pool = races.slice();
+  // Fisher-Yates。前から count 個だけ確定できれば十分
+  const n = Math.min(count, pool.length);
+  for (let i = 0; i < n; i++) {
+    const j = i + Math.floor(rnd() * (pool.length - i));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, n);
+}
+
 /** その時点での順位（0 が先頭）。同着は番号の若い順 */
 export function ranksAt(positions: number[][], progress: number): number[] {
   const xs = positions.map((p) => positionAt(p, progress));
