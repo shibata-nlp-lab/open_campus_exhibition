@@ -643,48 +643,53 @@ function LlmJpPicker({ c, patch }: { c: Interactive1Content; patch: Patch<Intera
   );
 }
 
-/** 体験②で動かす llm-jp のサイズ選択と、事前ダウンロード */
-function LlmJpNextPicker({ c, patch }: { c: Interactive2Content; patch: Patch<Interactive2Content> }) {
-  const [models, setModels] = useState<Array<{ size: string; label: string; mb: number; ready: boolean }>>([]);
+/** 体験②で動かすモデルの選択と、事前ダウンロード */
+function PredictModelPicker({ c, patch }: { c: Interactive2Content; patch: Patch<Interactive2Content> }) {
+  const [models, setModels] = useState<Array<{ id: string; label: string; mb: number; ready: boolean }>>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
-  const refresh = () => api.llmjp.nextModels().then(setModels);
+  const refresh = () => api.predict.models().then(setModels);
   useEffect(() => {
     refresh();
   }, []);
 
-  const size = c.llmjpNextSize ?? '150m';
-  const status = models.find((m) => m.size === size);
+  const id = c.predictModelId ?? '150m';
+  const status = models.find((m) => m.id === id);
 
   return (
     <>
       <Field
-        label="モデルのサイズ"
+        label="動かすモデル"
         helpTone="ok"
         help={
           <>
-            大きいほど候補が「らしく」なりますが、ダウンロードも1手あたりの時間も増えます。
+            大きいほど候補は納得しやすくなりますが、ダウンロードも1手あたりの時間も増えます。
             手元（Apple Silicon）で測った結果は次のとおりです。
             <br />
-            <span className="mono">150m ： 日本の首都は → 東京 57% ／ 次の単語を → 含む・使用・生成</span>
+            <span className="mono">150m ： 日本の首都は → 東京 57% ／ 次の単語を → 含む・生成</span>
             <br />
             <span className="mono">980m ： 日本の首都は → 東京 77% ／ 次の単語を → 生成 23%・予測 6%</span>
             <br />
-            展示で「次の語を予測している」と見せる目的なら、待ち時間の短い <strong>150m</strong> でも十分です。
-            候補の納得感を優先するなら 980m（1手 0.2〜0.5 秒・約1GB）を選んでください。
+            <span className="mono">gemma ： 日本の首都は → ？ 76% ／ 次の単語を → 予測 91%</span>
             <br />
-            サイズを変えたら、下のボタンでそのサイズを取得してください（サイズごとに別のファイルです）。
+            展示で「次の語を予測している」と見せる目的なら、待ち時間の短い <strong>150m</strong> で十分です。
+            <br />
+            <strong>gemma-2-2b-jpn は指示チューニング済み</strong>なので、「日本の首都は」のような
+            疑問文になりやすい文だと <span className="mono">？</span> を1位に出します。1手 1〜3 秒かかるため、
+            12語伸ばすと30秒ほど待ちます。選ぶ場合は例文を平叙文（「私は毎朝コーヒーを」など）にしてください。
+            <br />
+            モデルを変えたら、下のボタンでそれを取得してください（モデルごとに別のファイルです）。
           </>
         }
       >
         <select
           className="select"
-          value={size}
-          onChange={(e) => patch((x) => void (x.llmjpNextSize = e.target.value as Interactive2Content['llmjpNextSize']))}
+          value={id}
+          onChange={(e) => patch((x) => void (x.predictModelId = e.target.value as Interactive2Content['predictModelId']))}
         >
           {models.map((m) => (
-            <option key={m.size} value={m.size}>
+            <option key={m.id} value={m.id}>
               {m.label} — {m.mb}MB{m.ready ? '（取得済み）' : ''}
             </option>
           ))}
@@ -698,7 +703,7 @@ function LlmJpNextPicker({ c, patch }: { c: Interactive2Content; patch: Patch<In
             setBusy(true);
             setMsg(null);
             try {
-              await api.llmjp.prepareNext(size);
+              await api.predict.prepare(id);
               await refresh();
               setMsg('ダウンロードが完了しました。');
             } catch (e) {
@@ -911,10 +916,10 @@ function Interactive2Editor({ c, patch }: { c: Interactive2Content; patch: Patch
         label="次の単語の確率の取得元"
         helpTone={(c.predictSource ?? 'openai') === 'openai' ? 'warn' : 'ok'}
         help={
-          (c.predictSource ?? 'openai') === 'llmjp' ? (
+          (c.predictSource ?? 'openai') === 'local' ? (
             <>
-              日本語モデル llm-jp-3 をこのPC内で動かします。APIキーも通信も要らず、
-              1手あたり 0.05〜0.5 秒（サイズによる）で返ります。日本語のモデルなので候補が語のかたまりで出て、
+              日本語モデルをこのPC内で動かします。APIキーも通信も要らず、
+              1手あたり 0.05〜3 秒（モデルによる）で返ります。日本語のモデルなので候補が語のかたまりで出て、
               GPT より読みやすくなります（<span className="mono">日本の首都は → 東京 57%</span>）。
               <br />
               体験①の「llm-jp の埋め込み層」とは別物です。あちらは表を引くだけ、こちらはモデル本体を動かします。
@@ -935,10 +940,10 @@ function Interactive2Editor({ c, patch }: { c: Interactive2Content; patch: Patch
           onChange={(e) => patch((x) => void (x.predictSource = e.target.value as Interactive2Content['predictSource']))}
         >
           <option value="openai">OpenAI Chat Completions（要APIキー）</option>
-          <option value="llmjp">llm-jp-3（日本語モデル・APIキー不要）</option>
+          <option value="local">日本語モデル（APIキー不要）</option>
         </select>
       </Field>
-      {(c.predictSource ?? 'openai') === 'llmjp' && <LlmJpNextPicker c={c} patch={patch} />}
+      {(c.predictSource ?? 'openai') === 'local' && <PredictModelPicker c={c} patch={patch} />}
 
       <Field label="来場者への問いかけ">
         <input className="input" value={c.prompt} onChange={(e) => patch((x) => void (x.prompt = e.target.value))} />

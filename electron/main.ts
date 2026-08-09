@@ -35,12 +35,12 @@ import { embed, nextTokenCandidates, verifyKey } from './openai';
 import { embedLocal, isModelReady, prepareModel, RURI_MODELS, tokenizeRuri, type RuriSize } from './localEmbed';
 import { embedLlmJpIds, isLlmJpReady, LLMJP_MODELS, prepareLlmJpEmbed, type LlmJpSize } from './llmjpEmbed';
 import {
-  isLlmJpNextReady,
-  LLMJP_NEXT_MODELS,
-  nextTokensLlmJp,
-  prepareLlmJpNext,
-  type LlmJpNextSize,
-} from './llmjpNext';
+  isPredictModelReady,
+  nextTokensLocal,
+  PREDICT_MODELS,
+  preparePredictModel,
+  type PredictModelId,
+} from './predictNext';
 import type { ApiResult, AppConfig, ClearResult, DisplayInfo, PlaybackCommand, PlaybackState, Role } from '../src/types';
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
@@ -452,18 +452,18 @@ function registerIpc() {
     asResult(async () => embedLlmJpIds(args.groups, args.size))
   );
 
-  /* --- llm-jp 本体で次トークンを予測（体験②のオフライン版） --- */
-  ipcMain.handle('llmjp:nextModels', () =>
-    Object.entries(LLMJP_NEXT_MODELS).map(([size, m]) => ({
-      size,
+  /* --- ローカルのモデル本体で次トークンを予測（体験②の通信なし版） --- */
+  ipcMain.handle('predict:models', () =>
+    Object.entries(PREDICT_MODELS).map(([id, m]) => ({
+      id,
       label: m.label,
       mb: m.mb,
-      ready: isLlmJpNextReady(size as LlmJpNextSize),
+      ready: isPredictModelReady(id as PredictModelId),
     }))
   );
-  ipcMain.handle('llmjp:prepareNext', (_e, size: LlmJpNextSize) => asResult(() => prepareLlmJpNext(size)));
-  ipcMain.handle('llmjp:nextTokens', (_e, args: { text: string; topK: number; size: LlmJpNextSize }) =>
-    asResult(() => nextTokensLlmJp(args.text, args.topK, args.size))
+  ipcMain.handle('predict:prepare', (_e, id: PredictModelId) => asResult(() => preparePredictModel(id)));
+  ipcMain.handle('predict:nextTokens', (_e, args: { text: string; topK: number; id: PredictModelId }) =>
+    asResult(() => nextTokensLocal(args.text, args.topK, args.id))
   );
 
   /* --- ウィンドウ / ディスプレイ --- */
