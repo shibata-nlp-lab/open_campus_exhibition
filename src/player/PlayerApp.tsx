@@ -12,6 +12,7 @@ import SurveyStep from './SurveyStep';
 import BranchStep from './BranchStep';
 import StandbyStep, { StandbyView } from './StandbyStep';
 import { MuteAllContext } from './useAudio';
+import { AutoContext, type AutoState } from './useAuto';
 
 export interface StepProps<T extends Content = Content> {
   content: T;
@@ -30,14 +31,18 @@ export default function PlayerApp({
   scenarioId,
   startStandby = false,
   startMuted = false,
+  startAuto = false,
 }: {
   scenarioId: string | null;
   /** 待機画面を出した状態で始める（本編はコントローラから選ぶ） */
   startStandby?: boolean;
   /** 音を鳴らさずに始める（設定画面からの下見用。M キーで切り替えられる） */
   startMuted?: boolean;
+  /** 自動モードで始める（音声 → 待ち時間 → 次の画面 を人手なしで繰り返す） */
+  startAuto?: boolean;
 }) {
   const [muteAll, setMuteAll] = useState(startMuted);
+  const [auto, setAuto] = useState(startAuto);
   const [config, setConfig] = useState<AppConfig | null>(null);
   /** 表示中のシナリオ。コントローラから切り替えられるので state で持つ */
   const [currentId, setCurrentId] = useState<string | null>(scenarioId);
@@ -138,6 +143,7 @@ export default function PlayerApp({
       else if (k === 'r') restart();
       else if (k === 's') setStandby((v) => !v);
       else if (k === 'm') setMuteAll((v) => !v);
+      else if (k === 'a') setAuto((v) => !v);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -165,6 +171,7 @@ export default function PlayerApp({
       else if (cmd.type === 'standby') setStandby((v) => cmd.on ?? !v);
       else if (cmd.type === 'standbyMute') setStandbyMuted((v) => cmd.muted ?? !v);
       else if (cmd.type === 'muteAll') setMuteAll((v) => cmd.on ?? !v);
+      else if (cmd.type === 'auto') setAuto((v) => cmd.on ?? !v);
       else if (cmd.type === 'advance' || cmd.type === 'back') {
         // 表示中のコンテンツ側のキー処理（useStepKeys）にそのまま流す
         window.dispatchEvent(
@@ -228,6 +235,7 @@ export default function PlayerApp({
       },
       returnTo,
       muteAll,
+      auto,
     };
     const json = JSON.stringify(state);
     if (json === publishedRef.current) return;
@@ -245,6 +253,7 @@ export default function PlayerApp({
     effectiveStandby,
     returnTo,
     muteAll,
+    auto,
   ]);
 
   if (!config) return <div className="player" />;
@@ -283,6 +292,17 @@ export default function PlayerApp({
     runKey,
   };
 
+  /**
+   * 自動モードの状態。各ステップは useAutoTimer でこれを見て自分で次へ進む。
+   * cancel は「人が触ったので自動をやめる」、toStandby は「誰も反応しなかったので待機画面へ」。
+   */
+  const autoState: AutoState = {
+    // 待機画面を重ねている間は止める（裏で勝手に進んでしまわないように）
+    auto: auto && !standby,
+    cancel: () => setAuto(false),
+    toStandby: () => setStandby(true),
+  };
+
   const body = (() => {
     switch (content.type) {
       case 'video': return <VideoStep {...(stepProps as StepProps<typeof content>)} />;
@@ -305,6 +325,8 @@ export default function PlayerApp({
             {...(stepProps as StepProps<typeof content>)}
             targets={targets}
             onJump={(to) => {
+              // 体験に戻る＝人が操作を始めたということなので、自動送りはやめる
+              setAuto(false);
               setReturnTo(index);
               goto(to);
             }}
@@ -324,6 +346,7 @@ export default function PlayerApp({
 
   return (
     <MuteAllContext.Provider value={muteAll}>
+    <AutoContext.Provider value={autoState}>
     <div className="player">
       <div className="player-body" key={`${content.id}_${runKey}`}>
         {body}
@@ -339,6 +362,11 @@ export default function PlayerApp({
       )}
       <div className="player-bar">
         <span className="title">{config.settings.exhibitTitle}</span>
+        {auto && (
+          <span className="chip" title="A キーで解除" style={{ background: '#12301f', color: '#9ff0c4' }}>
+            ▶ 自動
+          </span>
+        )}
         {/* 消音中は必ず出す。音が鳴らないのを不具合と勘違いさせないため */}
         {muteAll && (
           <span className="chip" title="M キーで解除" style={{ background: '#37291a', color: '#ffd9a1' }}>
@@ -364,6 +392,7 @@ export default function PlayerApp({
         )}
       </div>
     </div>
+    </AutoContext.Provider>
     </MuteAllContext.Provider>
   );
 }

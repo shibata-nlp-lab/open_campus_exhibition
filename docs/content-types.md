@@ -213,6 +213,34 @@ PDF は pdfjs-dist でページ送りします。`autoAdvanceSec` は markdown /
 既存の config には `screenAudio` が無いので `migrate()` が**キー単位で**補います
 （丸ごと `??=` にすると、画面が増えたときに設定済みの config へ新しいキーが入りません）。
 
+## 自動モード
+
+人が付かずに回すモードです（設定画面「シナリオ」タブから開始、`A` キーで入り／切り）。
+[src/player/useAuto.ts](../src/player/useAuto.ts) の `AutoContext` を各ステップが読み、
+**自分で次へ進みます**。PlayerApp 側で一括して送るのではなく各ステップに任せているのは、
+「次の画面」がコンテンツごとに違うためです（スライドはページ、体験①は phase、体験②は1語ごと）。
+
+`useAutoTimer` は **音声が鳴り終わってから** `sec` 秒後に発火します。
+`useAudio` の `ended` を合図にしていて、**音声が無い・ループする・再生に失敗した**場合は
+最初から `ended = true` にします（そうしないと自動モードが止まります）。
+
+| type | 自動モードでの動き | 秒数 |
+| --- | --- | --- |
+| `video` | 再生し終わったら次へ（`autoAdvance` の設定は見ない）。ループなら秒数で切り上げ | `autoSec` |
+| `slide` | ページを送り、最後のページで次へ。`autoAdvanceSec` が 0 なら `autoSec` に落とす | `autoAdvanceSec` → `autoSec` |
+| `quiz` / `game` / `survey` | 答える人がいないので、見せるだけ見せて次へ | `autoSec` |
+| `interactive1` | `autoText` を入力 → 分割 → ベクトル化 → `autoTokenIndexes` を順にフォーカス → 次へ | `screenAutoSec[phase]` |
+| `interactive2` | `autoSeed` を入力 → `autoPickIndex` の候補を `autoPickCount` 回選ぶ → 次へ | `screenAutoSec[phase]` |
+| `branch` | 誰も押さなければ**待機画面へ**（次のコンテンツへは進めない） | `autoSec` |
+
+**分岐で「体験する」が押されたら自動モードを解除します**（`AutoContext.cancel`）。
+人が操作を引き取ったのに裏で勝手に画面が進むのを避けるためです。
+待機画面を重ねている間もタイマーは止まります。
+
+体験①②は入力を来場者に頼れないので、`run()` / `start()` に文字列を直接渡します。
+`setText` の反映を待つと、タイマーが先に発火したときに空文字で走って何も起きず、
+**自動モードがそこで止まってしまう**ためです。
+
 ## 種別を追加する手順
 
 1 種別あたり、触るのは 5 か所です。

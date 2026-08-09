@@ -3,9 +3,13 @@ import type { QuizContent } from '../types';
 import type { StepProps } from './PlayerApp';
 import { api } from '../lib/api';
 import { useAudio } from './useAudio';
+import { useAuto, useAutoTimer } from './useAuto';
 
 export default function QuizStep({ content, onFinish, record }: StepProps<QuizContent>) {
   const audio = useAudio(content.audio);
+  // 自動モードは来場者が答えないので、音声を流し終えたら先へ進む
+  const { auto } = useAuto();
+  useAutoTimer({ enabled: auto, audioEnded: audio.ended, sec: content.autoSec, fire: onFinish });
   const [qi, setQi] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [left, setLeft] = useState(content.timeLimitSec);

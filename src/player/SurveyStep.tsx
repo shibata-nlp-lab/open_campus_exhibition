@@ -2,11 +2,15 @@ import { useState } from 'react';
 import type { SurveyContent } from '../types';
 import type { StepProps } from './PlayerApp';
 import { useAudio } from './useAudio';
+import { useAuto, useAutoTimer } from './useAuto';
 
 const SCALE = ['とても良い', '良い', 'ふつう', 'いまいち', '良くない'];
 
 export default function SurveyStep({ content, onFinish, record }: StepProps<SurveyContent>) {
   const audio = useAudio(content.audio);
+  // 自動モードは人数を数える人がいないので、音声を流し終えたら先へ進む
+  const { auto } = useAuto();
+  useAutoTimer({ enabled: auto, audioEnded: audio.ended, sec: content.autoSec, fire: onFinish });
   const [people, setPeople] = useState(content.defaultPeople);
   const [qi, setQi] = useState(0);
   const [counts, setCounts] = useState<Record<string, number[]>>({});

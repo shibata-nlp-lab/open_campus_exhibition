@@ -132,6 +132,20 @@ export default function ScenarioPanel({ config, update, flush }: Props) {
               </button>
               <button
                 className="btn"
+                title="音声を流し、設定した待ち時間で自動的に次の画面へ進みます。人が操作しない展示用（A キーで解除できます）"
+                onClick={async () => {
+                  update((d) => {
+                    d.activeScenarioId = scenario.id;
+                    return d;
+                  });
+                  await flush();
+                  await api.player.open(scenario.id, { auto: true });
+                }}
+              >
+                ⏩ 自動モードで開始
+              </button>
+              <button
+                className="btn"
                 title="音を鳴らさずに開きます。隣で別の説明をしているときの下見用（進行画面で M キーを押せば元に戻せます）"
                 onClick={async () => {
                   update((d) => {

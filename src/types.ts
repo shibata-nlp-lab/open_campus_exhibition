@@ -20,6 +20,12 @@ export interface ContentBase {
   name: string;
   /** 進行中に画面下部へ出す補足（任意） */
   note?: string;
+  /**
+   * 自動モードのとき、**音声が鳴り終わってから**次へ進むまでの秒数。
+   * 音声が無い画面は「画面が出てから」この秒数で進む。
+   * 自動モード以外では一切使わない。
+   */
+  autoSec?: number;
 }
 
 /** BGM / ナレーション。assets 相対パス */
@@ -132,8 +138,13 @@ export type SimilarityDisplay = 'relative' | 'cosine';
  */
 export type Interactive1Phase = 'input' | 'tokens' | 'vectors';
 
-/** 体験②の画面。input: 入力画面 / predict: 予測を回している画面 */
-export type Interactive2Phase = 'input' | 'predict';
+/**
+ * 体験②の画面。
+ * - input:   入力画面
+ * - predict: 最初の候補が出た画面
+ * - pick:    候補を選んだあと（自動モードでは繰り返しここに戻る）
+ */
+export type Interactive2Phase = 'input' | 'predict' | 'pick';
 
 export interface Interactive1Content extends ContentBase {
   type: 'interactive1';
@@ -154,6 +165,16 @@ export interface Interactive1Content extends ContentBase {
    * 画面が切り替わると前の画面の音は止まる（重なって鳴らない）。
    */
   screenAudio: Record<Interactive1Phase, AudioSetting>;
+  /** 自動モードでの画面ごとの待ち時間（秒）。音声が終わってから数える */
+  screenAutoSec: Record<Interactive1Phase, number>;
+  /** 自動モードで入力する文 */
+  autoText: string;
+  /**
+   * 自動モードのベクトル画面で、順にフォーカスする単語の位置（0 起点）。
+   * 1つ見せるごとに screenAutoSec.vectors だけ待ち、最後まで行ったら次のコンテンツへ。
+   * 空なら先頭の単語だけを見せる。
+   */
+  autoTokenIndexes: number[];
 }
 
 /**
@@ -186,6 +207,14 @@ export interface Interactive2Content extends ContentBase {
   autoPickTop: boolean;
   /** 画面ごとの音声。体験①と同じ扱い */
   screenAudio: Record<Interactive2Phase, AudioSetting>;
+  /** 自動モードでの画面ごとの待ち時間（秒）。音声が終わってから数える */
+  screenAutoSec: Record<Interactive2Phase, number>;
+  /** 自動モードで入力する文 */
+  autoSeed: string;
+  /** 自動モードで選ぶ候補の位置（0 起点。0 なら常に確率1位） */
+  autoPickIndex: number;
+  /** 自動モードで何語ぶん選ぶか。ここまで選んだら次のコンテンツへ */
+  autoPickCount: number;
 }
 
 export interface GameChoice {
@@ -431,6 +460,8 @@ export interface PlaybackState {
   standbyAudio: { available: boolean; muted: boolean };
   /** 進行画面の音をまとめて止めているか（下見用。M キーで切り替わる） */
   muteAll: boolean;
+  /** 自動モードで動いているか（A キーで切り替わる） */
+  auto: boolean;
   /** いま効いている待機画面の「次の回のはじまり」（コントローラから編集するため） */
   standbyNext: { contentId: string; mode: NextStartMode; time: string };
   /**
@@ -455,4 +486,6 @@ export type PlaybackCommand =
   /** 待機画面のBGMのミュート切替（省略時はトグル） */
   | { type: 'standbyMute'; muted?: boolean }
   /** 進行画面の音をまとめて止める / 戻す（省略時はトグル） */
-  | { type: 'muteAll'; on?: boolean };
+  | { type: 'muteAll'; on?: boolean }
+  /** 自動モードの入り / 切り（省略時はトグル） */
+  | { type: 'auto'; on?: boolean };

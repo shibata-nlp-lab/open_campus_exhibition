@@ -98,6 +98,11 @@ export default function ControllerApp() {
           <div className="small muted">{state.scenarioName}</div>
           <h1>{current?.name ?? '—'}</h1>
           {state.standby && <span className="chip" style={{ background: '#37291a', color: '#ffd9a1' }}>待機画面を表示中</span>}
+          {state.auto && (
+            <span className="chip" title="A キーで解除できます" style={{ background: '#12301f', color: '#9ff0c4' }}>
+              ⏩ 自動モード（A で解除）
+            </span>
+          )}
           {/* 音が出ないのを不具合と勘違いさせないため、止めている間は必ず出す */}
           {state.muteAll && (
             <span
@@ -263,6 +268,7 @@ export default function ControllerApp() {
               ['N / P', '次 / 前のコンテンツ'],
               ['S', '待機画面の表示 / 解除'],
               ['M', '音声の停止 / 再開'],
+              ['A', '自動モードの入り / 切り'],
               ['R', '最初から'],
               ['F', '全画面切替'],
               ['Esc', '終了'],

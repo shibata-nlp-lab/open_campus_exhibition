@@ -14,7 +14,7 @@ import type {
   SurveyContent,
   VideoContent,
 } from '../types';
-import { CONTENT_LABELS, emptyAudio, uid } from '../defaults';
+import { CONTENT_LABELS, DEFAULT_AUTO_SEC, emptyAudio, uid } from '../defaults';
 import { api, errText } from '../lib/api';
 import { AssetPicker, Field, NumberField, Toggle } from './common';
 import { shiftIndex } from '../lib/reorder';
@@ -83,26 +83,116 @@ function ScreenAudioFields<T extends Interactive1Content | Interactive2Content>(
   screens: Array<{ key: string; label: string }>;
 }) {
   type Screens = T['screenAudio'];
+  const sec = (c.screenAutoSec as Record<string, number> | undefined) ?? {};
   return (
     <>
       <div className="small muted" style={{ margin: '18px 0 8px' }}>
         画面ごとの音声 — 画面が切り替わると前の音は止まります。使わない画面は空のままにしてください。
+        待ち時間は<strong>自動モードのときだけ</strong>使います。
       </div>
       {screens.map((s) => (
-        <AudioFields
-          key={s.key}
-          title={s.label}
-          audio={(c.screenAudio as Record<string, AudioSetting> | undefined)?.[s.key] ?? emptyAudio()}
-          patch={(fn) =>
-            patch((x) => {
-              // 古い config には screenAudio が無いことがあるので、触る直前に補う
-              const all = ((x.screenAudio ??= {} as Screens) as unknown) as Record<string, AudioSetting>;
-              all[s.key] ??= emptyAudio();
-              fn(all[s.key]);
-            })
-          }
-        />
+        <div key={s.key}>
+          <AudioFields
+            title={s.label}
+            audio={(c.screenAudio as Record<string, AudioSetting> | undefined)?.[s.key] ?? emptyAudio()}
+            patch={(fn) =>
+              patch((x) => {
+                // 古い config には screenAudio が無いことがあるので、触る直前に補う
+                const all = ((x.screenAudio ??= {} as Screens) as unknown) as Record<string, AudioSetting>;
+                all[s.key] ??= emptyAudio();
+                fn(all[s.key]);
+              })
+            }
+          />
+          <div style={{ margin: '-8px 0 14px' }}>
+            <NumberField
+              label={`自動モードの待ち時間（${s.label}）`}
+              value={sec[s.key] ?? DEFAULT_AUTO_SEC}
+              max={600}
+              suffix="秒（音声が鳴り終わってから）"
+              onChange={(v) =>
+                patch((x) => {
+                  const all = (x.screenAutoSec ??= {} as T['screenAutoSec']) as Record<string, number>;
+                  all[s.key] = v;
+                })
+              }
+            />
+          </div>
+        </div>
       ))}
+    </>
+  );
+}
+
+/** 「1,3,5」のような入力を 0 起点の位置に直す（画面では 1 番目から数える） */
+function parseIndexList(text: string): number[] {
+  return text
+    .split(/[^0-9]+/)
+    .filter(Boolean)
+    .map((n) => Number(n) - 1)
+    .filter((n) => n >= 0);
+}
+const formatIndexList = (list: number[]) => (list ?? []).map((n) => n + 1).join(', ');
+
+/** 体験①の自動モード設定（来場者の代わりに何を入力し、どの単語を見せるか） */
+function AutoInteractive1Fields({ c, patch }: { c: Interactive1Content; patch: Patch<Interactive1Content> }) {
+  return (
+    <>
+      <div className="small muted" style={{ margin: '18px 0 8px' }}>
+        自動モードの動き — 来場者の代わりにここで決めた内容を入力します。
+      </div>
+      <Field label="自動モードで入力する文">
+        <input
+          className="input"
+          value={c.autoText ?? ''}
+          onChange={(e) => patch((x) => void (x.autoText = e.target.value))}
+        />
+      </Field>
+      <Field
+        label="ベクトル画面で順に見せる単語（例：1, 3, 5）"
+        hint="1 が先頭の単語です。1つ見せるごとに上の「ベクトル化の画面」の待ち時間だけ止まり、最後まで行ったら次のコンテンツへ進みます。空なら先頭の単語だけを見せます。"
+      >
+        <input
+          className="input mono"
+          placeholder="1, 3, 5"
+          value={formatIndexList(c.autoTokenIndexes ?? [])}
+          onChange={(e) => patch((x) => void (x.autoTokenIndexes = parseIndexList(e.target.value)))}
+        />
+      </Field>
+    </>
+  );
+}
+
+/** 体験②の自動モード設定（何を入力し、どの候補を何語ぶん選ぶか） */
+function AutoInteractive2Fields({ c, patch }: { c: Interactive2Content; patch: Patch<Interactive2Content> }) {
+  return (
+    <>
+      <div className="small muted" style={{ margin: '18px 0 8px' }}>
+        自動モードの動き — 来場者の代わりにここで決めた内容を入力し、候補を選びます。
+      </div>
+      <Field label="自動モードで入力する文">
+        <input
+          className="input"
+          value={c.autoSeed ?? ''}
+          onChange={(e) => patch((x) => void (x.autoSeed = e.target.value))}
+        />
+      </Field>
+      <NumberField
+        label="選ぶ候補"
+        value={(c.autoPickIndex ?? 0) + 1}
+        min={1}
+        max={Math.max(1, c.topK)}
+        suffix="番目（1 なら常に確率がいちばん高いもの）"
+        onChange={(v) => patch((x) => void (x.autoPickIndex = Math.max(0, v - 1)))}
+      />
+      <NumberField
+        label="選ぶ回数"
+        value={c.autoPickCount ?? 5}
+        min={1}
+        max={Math.max(1, c.maxSteps)}
+        suffix="語ぶん選んだら次のコンテンツへ"
+        onChange={(v) => patch((x) => void (x.autoPickCount = v))}
+      />
     </>
   );
 }
@@ -902,6 +992,7 @@ function Interactive1Editor({ c, patch }: { c: Interactive1Content; patch: Patch
           { key: 'vectors', label: 'STEP 2 — ベクトル化の画面' },
         ]}
       />
+      <AutoInteractive1Fields c={c} patch={patch} />
     </>
   );
 }
@@ -965,9 +1056,11 @@ function Interactive2Editor({ c, patch }: { c: Interactive2Content; patch: Patch
         patch={patch}
         screens={[
           { key: 'input', label: '入力画面（予測を始める前）' },
-          { key: 'predict', label: '予測中の画面' },
+          { key: 'predict', label: '最初の候補が出た画面' },
+          { key: 'pick', label: '1語選んだあとの画面（くり返し）' },
         ]}
       />
+      <AutoInteractive2Fields c={c} patch={patch} />
     </>
   );
 }

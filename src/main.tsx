@@ -15,6 +15,7 @@ function Root() {
         scenarioId={params.get('scenario')}
         startStandby={params.get('standby') === '1'}
         startMuted={params.get('mute') === '1'}
+        startAuto={params.get('auto') === '1'}
       />
     );
   }

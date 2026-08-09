@@ -104,12 +104,14 @@ const api = {
     /**
      * standby: true で待機画面を出した状態から始める（本編はコントローラから選ぶ）
      * muted:   音を鳴らさずに始める（設定画面からの下見用）
+     * auto:    自動モードで始める（音声 → 待ち時間 → 次の画面 を人手なしで繰り返す）
      */
-    open: (scenarioId: string, opts?: { standby?: boolean; muted?: boolean }) =>
+    open: (scenarioId: string, opts?: { standby?: boolean; muted?: boolean; auto?: boolean }) =>
       ipcRenderer.invoke('player:open', {
         scenarioId,
         standby: Boolean(opts?.standby),
         muted: Boolean(opts?.muted),
+        auto: Boolean(opts?.auto),
       }),
     close: () => ipcRenderer.invoke('player:close'),
     /** 自分のウィンドウの全画面切替（進行画面から使う） */

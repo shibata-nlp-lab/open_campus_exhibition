@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Interactive2Content, TokenCandidate } from '../types';
+import type { Interactive2Content, Interactive2Phase, TokenCandidate } from '../types';
 import type { StepProps } from './PlayerApp';
 import { api, errText } from '../lib/api';
 import { isSubmitEnter } from '../lib/ime';
 import { useAudio } from './useAudio';
+import { useAuto, useAutoTimer } from './useAuto';
 
 /** API が使えないときの簡易候補（デモ継続用） */
 function offlineCandidates(text: string, topK: number): TokenCandidate[] {
@@ -35,8 +36,12 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
   const [error, setError] = useState<string | null>(null);
   const alive = useRef(true);
 
-  // 画面ごとの音声（入力画面／予測画面）。切り替わると前の画面の音は止まる
-  useAudio(content.screenAudio?.[started ? 'predict' : 'input']);
+  /**
+   * 画面ごとの音声。1語選んだあとは 'pick' に切り替える（同じ画面でも説明が変わるため）。
+   * 切り替わると前の画面の音は止まる。
+   */
+  const phase: Interactive2Phase = !started ? 'input' : steps === 0 ? 'predict' : 'pick';
+  const audio = useAudio(content.screenAudio?.[phase]);
 
   // StrictMode（開発時）は mount → cleanup → 再 mount するため、
   // 立ち上がりで必ず true に戻さないとフラグが false のままになり応答を捨て続ける
@@ -77,8 +82,9 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
     [content.topK, content.predictSource, content.predictModelId, config.settings.chatModel]
   );
 
-  const start = async () => {
-    const t = seed.trim();
+  /** override は自動モード用。setSeed の反映を待たずに走らせるために渡す */
+  const start = async (override?: string) => {
+    const t = (override ?? seed).trim();
     if (!t) return;
     setText(t);
     setStarted(true);
@@ -101,7 +107,30 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
     [text, steps, content.maxSteps, fetchCands]
   );
 
-  // 自動モード：1位を一定間隔で採用
+  /* ---------- 自動モード ---------- */
+  const { auto } = useAuto();
+  // 入力欄にも文字を出しておく（来場者から見て、入力されたように見せるため）
+  useEffect(() => {
+    if (auto && !started && !seed) setSeed(content.autoSeed ?? '');
+  }, [auto, started, seed, content.autoSeed]);
+
+  const autoPickCount = Math.max(1, content.autoPickCount ?? 5);
+  useAutoTimer({
+    enabled: auto && !busy,
+    audioEnded: audio.ended,
+    sec: content.screenAutoSec?.[phase],
+    // 1語選ぶたびに待ち直す
+    key: `${phase}_${steps}`,
+    fire: () => {
+      if (!started) return void start(content.autoSeed);
+      // 決めた回数まで選んだら次のコンテンツへ。候補が尽きたときも同じ
+      if (steps >= autoPickCount || cands.length === 0) return onFinish();
+      const at = Math.min(Math.max(0, content.autoPickIndex ?? 0), cands.length - 1);
+      void pick(cands[at].token);
+    },
+  });
+
+  // 自動モード（設定の autoPickTop）：1位を一定間隔で採用
   useEffect(() => {
     if (!started || !content.autoPickTop || busy || cands.length === 0) return;
     const t = window.setTimeout(() => pick(cands[0].token), 900);
@@ -129,7 +158,7 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
             ))}
           </div>
         )}
-        <button className="btn lg primary" onClick={start} disabled={!seed.trim()}>
+        <button className="btn lg primary" onClick={() => start()} disabled={!seed.trim()}>
           予想させてみる ▶
         </button>
       </div>

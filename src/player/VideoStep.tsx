@@ -3,6 +3,7 @@ import type { VideoContent } from '../types';
 import type { StepProps } from './PlayerApp';
 import { api } from '../lib/api';
 import { MuteAllContext } from './useAudio';
+import { useAuto, useAutoTimer } from './useAuto';
 
 export default function VideoStep({ content, onFinish }: StepProps<VideoContent>) {
   const ref = useRef<HTMLVideoElement | null>(null);
@@ -11,6 +12,10 @@ export default function VideoStep({ content, onFinish }: StepProps<VideoContent>
   // 全体消音のときは動画の音も止める（下見で音を出さないための設定なので）
   const muteAll = useContext(MuteAllContext);
   const muted = muteAll || mutedLocal;
+  const { auto } = useAuto();
+  // 自動モードでは、ループ再生のときだけ待ち時間で切り上げる。
+  // ループしないものは再生の終わりを合図にする（下の onEnded）
+  useAutoTimer({ enabled: auto && content.loop, audioEnded: true, sec: content.autoSec, fire: onFinish });
 
   useEffect(() => {
     ref.current?.play().catch(() => setPlaying(false));
@@ -45,7 +50,8 @@ export default function VideoStep({ content, onFinish }: StepProps<VideoContent>
         src={api.asset.url(content.src)}
         muted={muted}
         loop={content.loop}
-        onEnded={() => content.autoAdvance && !content.loop && onFinish()}
+        // 自動モードでは autoAdvance の設定によらず、再生し終わったら次へ進む
+        onEnded={() => (auto || content.autoAdvance) && !content.loop && onFinish()}
         onClick={toggle}
         style={{ width: '100%', height: '100%', objectFit: 'contain' }}
       />

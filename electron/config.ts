@@ -5,6 +5,9 @@ import type { AppConfig, ResultRecord } from '../src/types';
 import {
   createDefaultConfig,
   DEFAULT_ATTRIBUTE_OPTIONS,
+  DEFAULT_AUTO_SEC,
+  defaultInteractive1AutoSec,
+  defaultInteractive2AutoSec,
   emptyInteractive1Audio,
   emptyInteractive2Audio,
   mergeSamples,
@@ -88,6 +91,13 @@ export function migrate(config: AppConfig): AppConfig {
     for (const s of config.scenarios) s.steps = s.steps.filter((st) => !removed.includes(st.contentId));
   }
   for (const c of config.contents) {
+    // 自動モードの待ち時間。0 は「音声が終わったらすぐ」という意味なので ??= で入れる
+    c.autoSec ??= DEFAULT_AUTO_SEC;
+    if (c.type === 'interactive1') {
+      c.screenAutoSec = { ...defaultInteractive1AutoSec(), ...(c.screenAutoSec ?? {}) };
+      c.autoText ??= c.examples?.[0] ?? '';
+      if (!Array.isArray(c.autoTokenIndexes)) c.autoTokenIndexes = [];
+    }
     if (c.type === 'interactive1') {
       c.neighbourSource ??= 'curated';
       c.tokenizerMode ??= 'gpt';
@@ -103,6 +113,10 @@ export function migrate(config: AppConfig): AppConfig {
     }
     if (c.type === 'interactive2') {
       c.screenAudio = { ...emptyInteractive2Audio(), ...(c.screenAudio ?? {}) };
+      c.screenAutoSec = { ...defaultInteractive2AutoSec(), ...(c.screenAutoSec ?? {}) };
+      c.autoSeed ??= c.examples?.[0] ?? '';
+      c.autoPickIndex ??= 0;
+      c.autoPickCount ??= 5;
       // llm-jp 以外（gemma）も選べるようにしたので、'llmjp' / llmjpNextSize から名前を変えた。
       // v0.3.0 で書かれた config を読み替える
       const old = c as unknown as { predictSource?: string; llmjpNextSize?: string };
