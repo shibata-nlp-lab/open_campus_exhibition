@@ -148,10 +148,31 @@ Apple Developer ID を持っていないため、macOS 版は [scripts/adhoc-sig
 `ipcMain.handle` で reject すると、想定内の失敗でもメインプロセスのログにスタックトレースが出ます。
 `asResult` + `unwrap` の規約に揃えてください（[ipc.md](ipc.md)）。
 
-### sharp のアーキテクチャ
+### sharp のアーキテクチャ（Apple Silicon + Rosetta の Node）
 
-Rosetta の x64 Node で `npm ci` すると sharp の x64 版が入り、arm64 アプリに x64 バイナリが同梱されます。
-wasm フォールバックで動きはしますが遅くなります。`node -p process.arch` を確認してください。
+Rosetta の x64 Node で `npm install` すると、npm は **node に合わせて** x64 の sharp を入れます。
+一方 Electron は arm64 なので読み込めず、**wasm に落ちるのではなく次のエラーで落ちます**。
+
+```
+Cannot read properties of undefined (reading 'output')
+    at .../sharp/lib/utility.js:27
+```
+
+sharp は `@huggingface/transformers` が読み込むので、**体験①（Ruri / llm-jp）と
+体験②（llm-jp）がまとめて使えなくなります**。アプリのコード自体は sharp を使っていません。
+
+確認と対処:
+
+```bash
+node -p process.arch                                    # x64 なら Rosetta の Node
+npm install --include=optional --os=darwin --cpu=arm64  # arm64 のバイナリを入れる
+```
+
+`postinstall`（[scripts/fix-macos-electron.mjs](../scripts/fix-macos-electron.mjs)）が
+Electron と sharp の CPU 種別を突き合わせ、食い違っていればこのコマンドを出します。
+**素の `npm install` をするたびに戻ってしまう**ので、根治するなら arm64 の Node に入れ替えてください。
+
+CI（macos-14）は arm64 の Node なので、配布ビルドではこの問題は起きません。
 
 ## コードの書き方
 
