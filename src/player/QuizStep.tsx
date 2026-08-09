@@ -94,7 +94,8 @@ export default function QuizStep({ content, onFinish, record }: StepProps<QuizCo
           )}
         </div>
 
-        <h1>{q.text}</h1>
+        {/* 問題文も設定画面では複数行で書けるので、改行をそのまま出す */}
+        <h1 style={{ whiteSpace: 'pre-wrap' }}>{q.text}</h1>
         {q.imageSrc && <img src={api.asset.url(q.imageSrc)} style={{ maxHeight: '28vh', borderRadius: 12 }} />}
 
         <div className="choice-grid">
@@ -118,8 +119,11 @@ export default function QuizStep({ content, onFinish, record }: StepProps<QuizCo
         {answered && (
           <div className="fade-in col" style={{ alignItems: 'center', gap: 18 }}>
             {picked === -1 && <h2 style={{ color: 'var(--warn)' }}>時間切れ！</h2>}
+            {/* 解説は設定画面で入れた改行をそのまま出す（折り返しは通常どおり効く） */}
             {content.showExplanation && q.explanation && (
-              <p className="lead" style={{ maxWidth: 900 }}>{q.explanation}</p>
+              <p className="lead" style={{ maxWidth: 900, whiteSpace: 'pre-wrap' }}>
+                {q.explanation}
+              </p>
             )}
             <button className="btn lg primary" onClick={advance}>
               {qi + 1 < content.questions.length ? '次の問題 ▶' : '結果を見る ▶'}

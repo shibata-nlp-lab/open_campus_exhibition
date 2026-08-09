@@ -133,7 +133,12 @@ export default function GameStep({ content, onFinish, record }: StepProps<GameCo
             <h2 style={{ color: picked === round.answerIndex ? 'var(--ok)' : 'var(--warn)' }}>
               {picked === round.answerIndex ? '正解！' : picked === -1 ? '時間切れ！' : 'ざんねん…'}
             </h2>
-            {round.explanation && <p className="lead" style={{ maxWidth: 900 }}>{round.explanation}</p>}
+            {/* 解説は設定画面で入れた改行をそのまま出す（折り返しは通常どおり効く） */}
+            {round.explanation && (
+              <p className="lead" style={{ maxWidth: 900, whiteSpace: 'pre-wrap' }}>
+                {round.explanation}
+              </p>
+            )}
             <button className="btn lg primary" onClick={advance}>
               {ri + 1 < content.rounds.length ? '次の問題 ▶' : '結果を見る ▶'}
             </button>
