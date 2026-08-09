@@ -176,9 +176,8 @@ export function createContent(type: ContentType): Content {
         ...base,
         type,
         message: '実際に体験してみますか？',
-        submessage: '体験したい人は「体験する」を選んでください',
-        targetContentId: null,
-        goLabel: '体験する ▶',
+        submessage: '体験したいものを選んでください',
+        targets: [],
         stayLabel: 'ここで終わる',
         audio: emptyAudio(),
       } as BranchContent;

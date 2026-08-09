@@ -217,17 +217,21 @@ export interface SurveyContent extends ContentBase {
  * 説明が終わったあと、希望する人だけ前の体験コンテンツへ戻すために置く。
  * 戻った先で「次へ」を押すと、次のコンテンツではなくこの画面に帰ってくる。
  */
+/** 分岐画面に並べる「戻り先」1つぶん */
+export interface BranchTarget {
+  id: string;
+  /** 戻り先のコンテンツ。シナリオ内に見つからないときはボタンを出さない */
+  contentId: string | null;
+  /** ボタンの文言。空ならコンテンツ名をそのまま出す */
+  label: string;
+}
+
 export interface BranchContent extends ContentBase {
   type: 'branch';
   message: string;
   submessage: string;
-  /**
-   * 「体験する」で戻る先のコンテンツ。
-   * シナリオ内に見つからないときはボタンを出さない（展示を止めないため）。
-   */
-  targetContentId: string | null;
-  /** 戻るほうのボタンの文言 */
-  goLabel: string;
+  /** 戻り先。並べた順にボタンが出る。0 個なら「進む」だけの画面になる */
+  targets: BranchTarget[];
   /** 先へ進むほうのボタンの文言 */
   stayLabel: string;
   audio: AudioSetting;

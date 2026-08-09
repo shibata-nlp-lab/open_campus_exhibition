@@ -284,18 +284,20 @@ export default function PlayerApp({
       case 'game': return <GameStep {...(stepProps as StepProps<typeof content>)} />;
       case 'survey': return <SurveyStep {...(stepProps as StepProps<typeof content>)} />;
       case 'branch': {
-        const target = findBranchTarget(
-          steps.map((c) => c.id),
-          index,
-          content.targetContentId
-        );
+        const ids = steps.map((c) => c.id);
+        // 見つからない戻り先はボタンごと出さない。押しても何も起きないほうが展示中は困る
+        const targets = (content.targets ?? []).flatMap((t) => {
+          const at = findBranchTarget(ids, index, t.contentId);
+          if (at < 0) return [];
+          return [{ id: t.id, index: at, label: t.label || steps[at].name }];
+        });
         return (
           <BranchStep
             {...(stepProps as StepProps<typeof content>)}
-            targetIndex={target}
-            onJump={() => {
+            targets={targets}
+            onJump={(to) => {
               setReturnTo(index);
-              goto(target);
+              goto(to);
             }}
           />
         );

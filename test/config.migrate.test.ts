@@ -4,6 +4,7 @@ import path from 'node:path';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type {
   AppConfig,
+  BranchContent,
   Interactive1Content,
   Interactive2Content,
   SlideContent,
@@ -126,6 +127,43 @@ describe('migrate — 新しく増えたフィールドの補完', () => {
     expect(a.tokens).toEqual({ src: 'a.mp3', volume: 0.3, loop: true });
     expect(a.input.src).toBeNull();
     expect(a.vectors.src).toBeNull();
+  });
+
+  it('分岐の戻り先が1つだけだった旧形式を、1件の targets に畳む', () => {
+    const cfg = migrate(
+      base({
+        contents: [
+          {
+            id: 'c1',
+            type: 'branch',
+            name: '体験に戻る',
+            targetContentId: 'exp1',
+            goLabel: '体験する ▶',
+          } as never,
+        ],
+      })
+    );
+    const c = cfg.contents[0] as BranchContent;
+    expect(c.targets).toHaveLength(1);
+    expect(c.targets[0].contentId).toBe('exp1');
+    expect(c.targets[0].label).toBe('体験する ▶');
+    expect(c.targets[0].id).toBeTruthy();
+    // 旧フィールドは残さない（両方見て食い違うのを防ぐ）
+    expect('targetContentId' in c).toBe(false);
+    expect('goLabel' in c).toBe(false);
+  });
+
+  it('旧形式で戻り先が未設定なら、空の targets にする', () => {
+    const cfg = migrate(
+      base({ contents: [{ id: 'c1', type: 'branch', name: '体験に戻る', targetContentId: null } as never] })
+    );
+    expect((cfg.contents[0] as BranchContent).targets).toEqual([]);
+  });
+
+  it('すでに targets があれば触らない', () => {
+    const targets = [{ id: 'bt1', contentId: 'exp1', label: '' }];
+    const cfg = migrate(base({ contents: [{ id: 'c1', type: 'branch', name: '分岐', targets } as never] }));
+    expect((cfg.contents[0] as BranchContent).targets).toEqual(targets);
   });
 
   it('standby の開始時刻まわりに既定値を入れる', () => {
