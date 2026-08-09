@@ -41,7 +41,7 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
    * 切り替わると前の画面の音は止まる。
    */
   const phase: Interactive2Phase = !started ? 'input' : steps === 0 ? 'predict' : 'pick';
-  const audio = useAudio(content.screenAudio?.[phase]);
+  const audio = useAudio(content.screenAudio?.[phase], undefined, phase);
 
   // StrictMode（開発時）は mount → cleanup → 再 mount するため、
   // 立ち上がりで必ず true に戻さないとフラグが false のままになり応答を捨て続ける

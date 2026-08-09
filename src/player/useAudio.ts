@@ -8,8 +8,14 @@ import { api } from '../lib/api';
  */
 export const MuteAllContext = createContext(false);
 
-/** コンテンツ表示中だけ鳴らす BGM / ナレーション */
-export function useAudio(setting: AudioSetting | undefined, mutedExternal?: boolean) {
+/**
+ * コンテンツ表示中だけ鳴らす BGM / ナレーション。
+ *
+ * restartKey を渡すと、同じファイルを続けて指定していても頭から鳴らし直す。
+ * 体験①・②のように 1 つのコンテンツの中で画面が変わるものは、これを渡さないと
+ * 「前の画面で鳴り終わった」状態が残り、次の画面が音を待たずに進んでしまう。
+ */
+export function useAudio(setting: AudioSetting | undefined, mutedExternal?: boolean, restartKey?: unknown) {
   const ref = useRef<HTMLAudioElement | null>(null);
   const [mutedLocal, setMuted] = useState(false);
   const muteAll = useContext(MuteAllContext);
@@ -33,6 +39,9 @@ export function useAudio(setting: AudioSetting | undefined, mutedExternal?: bool
       return;
     }
     setEnded(false);
+    // この効果で作った <audio> がまだ現役かどうか。
+    // 差し替えたあとに古い再生の結果が届いても、それで「鳴り終わった」ことにしない
+    let current = true;
     const el = new Audio(api.asset.url(setting.src));
     el.volume = setting.volume;
     el.loop = setting.loop;
@@ -40,16 +49,23 @@ export function useAudio(setting: AudioSetting | undefined, mutedExternal?: bool
     el.muted = mutedRef.current;
     // ループする音は終わりが来ないので、待たずに次へ進めてよいことにする
     if (setting.loop) setEnded(true);
-    el.addEventListener('ended', () => setEnded(true));
-    // 再生できなかったとき（対応していない形式など）に自動モードを止めない
-    el.play().catch(() => setEnded(true));
+    el.addEventListener('ended', () => {
+      if (current) setEnded(true);
+    });
+    // 再生できなかったとき（対応していない形式など）に自動モードを止めない。
+    // ただし、下の後始末で止めたことによる失敗（開発時の二重実行や画面の切り替え）は
+    // 「鳴り終わった」ではないので無視する
+    el.play().catch(() => {
+      if (current) setEnded(true);
+    });
     ref.current = el;
     return () => {
+      current = false;
       el.pause();
       el.src = '';
       ref.current = null;
     };
-  }, [setting?.src, setting?.volume, setting?.loop]);
+  }, [setting?.src, setting?.volume, setting?.loop, restartKey]);
 
   useEffect(() => {
     if (ref.current) ref.current.muted = muted;
