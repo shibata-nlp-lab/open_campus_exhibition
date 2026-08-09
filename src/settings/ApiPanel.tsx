@@ -132,6 +132,78 @@ export default function ApiPanel({ config, update }: PanelProps) {
         当日ネットワークが不安定な場合に備え、インタラクティブ1/2 はエラー時に「オフライン用の疑似計算」に自動フォールバックします
         （画面上にその旨が表示されます）。
       </div>
+
+      <StoredModels />
     </>
+  );
+}
+
+const formatBytes = (n: number) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)}GB` : `${Math.round(n / 1e6)}MB`);
+
+/**
+ * ダウンロード済みモデルの一覧と削除。
+ * 全部そろえると数GBになり、展示用のノートPCだと空きを圧迫するため。
+ */
+function StoredModels() {
+  const [models, setModels] = useState<Array<{ path: string; label: string; usedBy: string; bytes: number }>>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const refresh = () => api.models.list().then(setModels);
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  const total = models.reduce((a, m) => a + m.bytes, 0);
+
+  return (
+    <div className="card" style={{ maxWidth: 680, marginTop: 16 }}>
+      <div className="row" style={{ marginBottom: 8 }}>
+        <strong style={{ flex: 1 }}>ダウンロード済みモデル</strong>
+        <span className="small muted">合計 {formatBytes(total)}</span>
+      </div>
+      <p className="small muted" style={{ marginTop: 0 }}>
+        体験①②で使うモデルの保存場所です。消しても設定は変わらず、次に使うときに落とし直します。
+      </p>
+
+      {models.length === 0 && <div className="small muted">まだ何もダウンロードしていません。</div>}
+
+      <div className="col" style={{ gap: 6 }}>
+        {models.map((m) => (
+          <div key={m.path} className="row" style={{ alignItems: 'center' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div>{m.label}</div>
+              <div className="small muted mono" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {m.usedBy ? `${m.usedBy} — ` : ''}
+                {m.path}
+              </div>
+            </div>
+            <span className="small muted" style={{ whiteSpace: 'nowrap' }}>{formatBytes(m.bytes)}</span>
+            <button
+              className="btn sm danger"
+              disabled={busy !== null}
+              onClick={async () => {
+                if (!confirm(`「${m.label}」（${formatBytes(m.bytes)}）を削除しますか？\n次に使うときに落とし直します。`)) return;
+                setBusy(m.path);
+                setMsg(null);
+                try {
+                  const { bytes } = await api.models.delete(m.path);
+                  await refresh();
+                  setMsg(`${formatBytes(bytes)} を削除しました。`);
+                } catch (e) {
+                  setMsg(errText(e));
+                } finally {
+                  setBusy(null);
+                }
+              }}
+            >
+              {busy === m.path ? '削除中…' : '削除'}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {msg && <div className="banner ok" style={{ marginTop: 12 }}>{msg}</div>}
+    </div>
   );
 }

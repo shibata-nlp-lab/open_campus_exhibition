@@ -18,9 +18,24 @@
 | `results.jsonl` | 集計ログ（1行1レコード） |
 | `results-YYYYMMDD-HHMMSS.jsonl` | リセット時の自動バックアップ |
 | `cache/` | 埋め込みのキャッシュ |
-| `models/` | Ruri v3 のモデルとトークナイザ（[nlp.md](nlp.md)） |
+| `models/` | 体験①②のモデル（[nlp.md](nlp.md)）。**設定画面の「API」タブで一覧・削除できます** |
 
 リポジトリ直下の `contents/` は**ユーザーが自分で置く素材の場所**で、アプリは直接読みません（git 上は空です）。
+
+### models/ の中身
+
+```
+models/
+├── <org>/<repo>/…                    transformers.js のキャッシュ（Ruri / 体験②のモデル）
+└── llm-jp/llm-jp-3-*-embed.bin       体験①の埋め込み層（自前で切り出したもの）
+```
+
+全部そろえると数GBになります（体験②の gemma だけで 2.6GB）。展示用のノートPCは空きが少ないことが
+多いので、設定画面から**行ごとに削除**できます（[electron/modelFiles.ts](../electron/modelFiles.ts)）。
+消しても config は変わらず、次に使うときに落とし直します。
+
+削除するパスはレンダラから渡ってくるので、**`models/` の外を指していたら必ず断ります**
+（`..` や絶対パスを含めてテストで固定しています）。
 
 ## config.json
 

@@ -429,6 +429,8 @@ export interface PlaybackState {
   standby: boolean;
   /** 待機画面のBGMの状態（コントローラから操作するため） */
   standbyAudio: { available: boolean; muted: boolean };
+  /** 進行画面の音をまとめて止めているか（下見用。M キーで切り替わる） */
+  muteAll: boolean;
   /** いま効いている待機画面の「次の回のはじまり」（コントローラから編集するため） */
   standbyNext: { contentId: string; mode: NextStartMode; time: string };
   /**
@@ -451,4 +453,6 @@ export type PlaybackCommand =
   /** 待機画面のオン/オフ（省略時はトグル） */
   | { type: 'standby'; on?: boolean }
   /** 待機画面のBGMのミュート切替（省略時はトグル） */
-  | { type: 'standbyMute'; muted?: boolean };
+  | { type: 'standbyMute'; muted?: boolean }
+  /** 進行画面の音をまとめて止める / 戻す（省略時はトグル） */
+  | { type: 'muteAll'; on?: boolean };

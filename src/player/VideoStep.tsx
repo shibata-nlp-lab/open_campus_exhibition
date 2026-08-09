@@ -1,12 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import type { VideoContent } from '../types';
 import type { StepProps } from './PlayerApp';
 import { api } from '../lib/api';
+import { MuteAllContext } from './useAudio';
 
 export default function VideoStep({ content, onFinish }: StepProps<VideoContent>) {
   const ref = useRef<HTMLVideoElement | null>(null);
-  const [muted, setMuted] = useState(content.muted);
+  const [mutedLocal, setMuted] = useState(content.muted);
   const [playing, setPlaying] = useState(true);
+  // 全体消音のときは動画の音も止める（下見で音を出さないための設定なので）
+  const muteAll = useContext(MuteAllContext);
+  const muted = muteAll || mutedLocal;
 
   useEffect(() => {
     ref.current?.play().catch(() => setPlaying(false));

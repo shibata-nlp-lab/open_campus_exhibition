@@ -86,6 +86,12 @@ const api = {
     embed: (groups: number[][], size: string): Promise<number[][]> =>
       unwrap(ipcRenderer.invoke('llmjp:embed', { groups, size })),
   },
+  /** ダウンロード済みモデルの一覧と削除（展示PCの空き容量のため） */
+  models: {
+    list: (): Promise<Array<{ path: string; label: string; usedBy: string; bytes: number }>> =>
+      ipcRenderer.invoke('models:list'),
+    delete: (rel: string): Promise<{ bytes: number }> => unwrap(ipcRenderer.invoke('models:delete', rel)),
+  },
   /** 体験②用。モデル本体をこのPCで動かして「次の1語」の確率を出す（llm-jp / gemma） */
   predict: {
     models: (): Promise<Array<{ id: string; label: string; mb: number; ready: boolean }>> =>
@@ -95,9 +101,16 @@ const api = {
       unwrap(ipcRenderer.invoke('predict:nextTokens', { text, topK, id })),
   },
   player: {
-    /** standby: true で待機画面を出した状態から始める（本編はコントローラから選ぶ） */
-    open: (scenarioId: string, opts?: { standby?: boolean }) =>
-      ipcRenderer.invoke('player:open', { scenarioId, standby: Boolean(opts?.standby) }),
+    /**
+     * standby: true で待機画面を出した状態から始める（本編はコントローラから選ぶ）
+     * muted:   音を鳴らさずに始める（設定画面からの下見用）
+     */
+    open: (scenarioId: string, opts?: { standby?: boolean; muted?: boolean }) =>
+      ipcRenderer.invoke('player:open', {
+        scenarioId,
+        standby: Boolean(opts?.standby),
+        muted: Boolean(opts?.muted),
+      }),
     close: () => ipcRenderer.invoke('player:close'),
     /** 自分のウィンドウの全画面切替（進行画面から使う） */
     toggleFullscreen: () => ipcRenderer.invoke('window:toggleFullscreen'),

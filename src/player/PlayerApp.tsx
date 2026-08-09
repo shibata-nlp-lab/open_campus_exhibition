@@ -11,6 +11,7 @@ import GameStep from './GameStep';
 import SurveyStep from './SurveyStep';
 import BranchStep from './BranchStep';
 import StandbyStep, { StandbyView } from './StandbyStep';
+import { MuteAllContext } from './useAudio';
 
 export interface StepProps<T extends Content = Content> {
   content: T;
@@ -28,11 +29,15 @@ export interface StepProps<T extends Content = Content> {
 export default function PlayerApp({
   scenarioId,
   startStandby = false,
+  startMuted = false,
 }: {
   scenarioId: string | null;
   /** 待機画面を出した状態で始める（本編はコントローラから選ぶ） */
   startStandby?: boolean;
+  /** 音を鳴らさずに始める（設定画面からの下見用。M キーで切り替えられる） */
+  startMuted?: boolean;
 }) {
+  const [muteAll, setMuteAll] = useState(startMuted);
   const [config, setConfig] = useState<AppConfig | null>(null);
   /** 表示中のシナリオ。コントローラから切り替えられるので state で持つ */
   const [currentId, setCurrentId] = useState<string | null>(scenarioId);
@@ -132,6 +137,7 @@ export default function PlayerApp({
       else if (k === 'f') api.player.toggleFullscreen();
       else if (k === 'r') restart();
       else if (k === 's') setStandby((v) => !v);
+      else if (k === 'm') setMuteAll((v) => !v);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -158,6 +164,7 @@ export default function PlayerApp({
       else if (cmd.type === 'restart') restart();
       else if (cmd.type === 'standby') setStandby((v) => cmd.on ?? !v);
       else if (cmd.type === 'standbyMute') setStandbyMuted((v) => cmd.muted ?? !v);
+      else if (cmd.type === 'muteAll') setMuteAll((v) => cmd.on ?? !v);
       else if (cmd.type === 'advance' || cmd.type === 'back') {
         // 表示中のコンテンツ側のキー処理（useStepKeys）にそのまま流す
         window.dispatchEvent(
@@ -220,6 +227,7 @@ export default function PlayerApp({
         time: effectiveStandby.nextStartTime ?? '',
       },
       returnTo,
+      muteAll,
     };
     const json = JSON.stringify(state);
     if (json === publishedRef.current) return;
@@ -236,6 +244,7 @@ export default function PlayerApp({
     standbyMuted,
     effectiveStandby,
     returnTo,
+    muteAll,
   ]);
 
   if (!config) return <div className="player" />;
@@ -314,6 +323,7 @@ export default function PlayerApp({
   })();
 
   return (
+    <MuteAllContext.Provider value={muteAll}>
     <div className="player">
       <div className="player-body" key={`${content.id}_${runKey}`}>
         {body}
@@ -322,13 +332,19 @@ export default function PlayerApp({
         <StandbyView
           content={overlayStandby}
           overlay
-          muted={standbyMuted}
+          muted={standbyMuted || muteAll}
           hideActions={hasController}
           onFinish={() => setStandby(false)}
         />
       )}
       <div className="player-bar">
         <span className="title">{config.settings.exhibitTitle}</span>
+        {/* 消音中は必ず出す。音が鳴らないのを不具合と勘違いさせないため */}
+        {muteAll && (
+          <span className="chip" title="M キーで解除" style={{ background: '#37291a', color: '#ffd9a1' }}>
+            🔇 音声オフ
+          </span>
+        )}
         <div className="progress-dots">
           {steps.map((_, i) => (
             <i key={i} className={i < index ? 'done' : i === index ? 'current' : ''} />
@@ -348,5 +364,6 @@ export default function PlayerApp({
         )}
       </div>
     </div>
+    </MuteAllContext.Provider>
   );
 }

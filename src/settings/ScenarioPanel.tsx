@@ -132,6 +132,20 @@ export default function ScenarioPanel({ config, update, flush }: Props) {
               </button>
               <button
                 className="btn"
+                title="音を鳴らさずに開きます。隣で別の説明をしているときの下見用（進行画面で M キーを押せば元に戻せます）"
+                onClick={async () => {
+                  update((d) => {
+                    d.activeScenarioId = scenario.id;
+                    return d;
+                  });
+                  await flush();
+                  await api.player.open(scenario.id, { muted: true });
+                }}
+              >
+                🔇 音声を止めて開始
+              </button>
+              <button
+                className="btn"
                 title="待機画面を出した状態で開きます。本編への切り替えはコントローラから行います"
                 onClick={async () => {
                   update((d) => {
