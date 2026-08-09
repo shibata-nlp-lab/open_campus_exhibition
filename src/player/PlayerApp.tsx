@@ -13,6 +13,7 @@ import BranchStep from './BranchStep';
 import StandbyStep, { StandbyView } from './StandbyStep';
 import { MuteAllContext } from './useAudio';
 import { AutoContext, type AutoState } from './useAuto';
+import { useCue } from './useCue';
 
 export interface StepProps<T extends Content = Content> {
   content: T;
@@ -53,6 +54,8 @@ export default function PlayerApp({
   const [standbyMuted, setStandbyMuted] = useState(false);
   /** コントローラ画面が開いているか。開いていれば来場者側に操作ボタンは出さない */
   const [hasController, setHasController] = useState(false);
+  /** ポン出し（コントローラのボタンで鳴らす音）。コンテンツの音声に重ねて出す */
+  const cue = useCue(config?.settings.cues ?? [], muteAll);
 
   useEffect(() => {
     api.config.load().then(setConfig);
@@ -172,6 +175,8 @@ export default function PlayerApp({
       else if (cmd.type === 'standbyMute') setStandbyMuted((v) => cmd.muted ?? !v);
       else if (cmd.type === 'muteAll') setMuteAll((v) => cmd.on ?? !v);
       else if (cmd.type === 'auto') setAuto((v) => cmd.on ?? !v);
+      else if (cmd.type === 'cue') cue.play(cmd.id);
+      else if (cmd.type === 'cueStop') cue.stop();
       else if (cmd.type === 'advance' || cmd.type === 'back') {
         // 表示中のコンテンツ側のキー処理（useStepKeys）にそのまま流す
         window.dispatchEvent(
@@ -236,6 +241,7 @@ export default function PlayerApp({
       returnTo,
       muteAll,
       auto,
+      cue: cue.playing,
     };
     const json = JSON.stringify(state);
     if (json === publishedRef.current) return;
@@ -254,6 +260,7 @@ export default function PlayerApp({
     returnTo,
     muteAll,
     auto,
+    cue.playing,
   ]);
 
   if (!config) return <div className="player" />;

@@ -141,15 +141,35 @@ export default function ControllerApp() {
         )}
       </div>
 
+      {/*
+        自動モード中は進行の操作を受け付けない。うっかり触って自動送りと二重に進むのを防ぐ。
+        解除だけはここからできる（キーボードの A でも同じ）。
+      */}
+      {state.auto && (
+        <div className="ctrl-buttons" style={{ marginBottom: 12 }}>
+          <button
+            className="btn lg primary"
+            style={{ flex: 1 }}
+            onClick={() => api.playback.send({ type: 'auto', on: false })}
+          >
+            ⏹ 自動モードを解除して手動に戻す
+          </button>
+        </div>
+      )}
+
       <div className="ctrl-buttons">
-        <button className="btn lg" onClick={() => api.playback.send({ type: 'prev' })} disabled={state.index === 0}>
+        <button
+          className="btn lg"
+          onClick={() => api.playback.send({ type: 'prev' })}
+          disabled={state.auto || state.index === 0}
+        >
           ◀ 前へ
         </button>
         {/* 最後まで行っていても押せる。そのときは待機画面に移る */}
-        <button className="btn lg primary" onClick={() => api.playback.send({ type: 'next' })}>
+        <button className="btn lg primary" onClick={() => api.playback.send({ type: 'next' })} disabled={state.auto}>
           {returning ? '体験を終える ▶' : state.index >= state.total - 1 ? '待機画面へ ▶' : '次へ ▶'}
         </button>
-        <button className="btn lg" onClick={() => api.playback.send({ type: 'restart' })}>
+        <button className="btn lg" onClick={() => api.playback.send({ type: 'restart' })} disabled={state.auto}>
           ⟲ 最初から
         </button>
       </div>
@@ -162,6 +182,7 @@ export default function ControllerApp() {
         <button
           className={`btn lg ${state.standby ? '' : 'primary'}`}
           style={{ width: '100%', padding: '16px 0' }}
+          disabled={state.auto}
           onClick={() => api.playback.send({ type: 'standby', on: !state.standby })}
         >
           {state.standby ? '待機画面を解除して再開 ▶' : '⏸ 待機画面を表示する'}
@@ -190,6 +211,33 @@ export default function ControllerApp() {
         <NextStartPanel config={config} state={state} />
       </section>
 
+      {(config?.settings.cues?.length ?? 0) > 0 && (
+        <section>
+          <div className="ctrl-label">ポン出し（進行中の音に重ねて鳴らします）</div>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            {config!.settings.cues.map((cue) => {
+              const on = state.cue === cue.id;
+              return (
+                <button
+                  key={cue.id}
+                  className={`btn ${on ? 'primary' : ''}`}
+                  disabled={!cue.src}
+                  title={cue.src ? (on ? 'もう一度押すと止まります' : '') : '音声ファイルが未設定です'}
+                  onClick={() => api.playback.send({ type: 'cue', id: cue.id })}
+                >
+                  {on ? '⏹ ' : '🔔 '}
+                  {cue.label || '（名前なし）'}
+                </button>
+              );
+            })}
+            <div className="spacer" />
+            <button className="btn sm" disabled={!state.cue} onClick={() => api.playback.send({ type: 'cueStop' })}>
+              ■ 止める
+            </button>
+          </div>
+        </section>
+      )}
+
       <AttributePanel config={config} state={state} />
 
       {(state.scenarios?.length ?? 0) > 1 && (
@@ -200,6 +248,7 @@ export default function ControllerApp() {
               <button
                 key={s.id}
                 className={`btn ${s.id === state.scenarioId ? 'primary' : ''}`}
+                disabled={state.auto}
                 onClick={() => api.playback.send({ type: 'scenario', id: s.id })}
               >
                 {s.id === state.scenarioId ? '● ' : '▶ '}
@@ -222,6 +271,7 @@ export default function ControllerApp() {
             <button
               key={s.id}
               className={`ctrl-step ${i === state.index ? 'active' : ''} ${i < state.index ? 'done' : ''}`}
+              disabled={state.auto}
               onClick={() => api.playback.send({ type: 'goto', index: i })}
             >
               <span className="step-idx">{i + 1}</span>

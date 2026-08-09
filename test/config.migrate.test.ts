@@ -277,6 +277,17 @@ describe('migrate — 新しく増えたフィールドの補完', () => {
     );
   });
 
+  it('ポン出しの一覧が無ければ空で用意する（設定画面で追加できるように）', () => {
+    const cfg = base();
+    delete (cfg.settings as Partial<AppConfig['settings']>).cues;
+    expect(migrate(cfg).settings.cues).toEqual([]);
+  });
+
+  it('登録済みのポン出しは残す', () => {
+    const cues = [{ id: 'cue1', label: '拍手', src: 'clap.mp3', volume: 0.8, loop: false }];
+    expect(migrate(base({ settings: { ...base().settings, cues } })).settings.cues).toEqual(cues);
+  });
+
   it('自分で決めた区分は残す', () => {
     const cfg = migrate(base({ settings: { ...base().settings, attributeOptions: ['引率の先生'] } }));
     expect(cfg.settings.attributeOptions).toEqual(['引率の先生']);

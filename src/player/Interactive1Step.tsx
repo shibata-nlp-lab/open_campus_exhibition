@@ -172,23 +172,40 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
     if (auto && phase === 'input' && !text) setText(content.autoText ?? '');
   }, [auto, phase, text, content.autoText]);
 
+  const focusList = content.autoTokenIndexes ?? [];
+  /** ベクトル画面で、まだ見せていない単語が残っているか */
+  const moreFocus = phase === 'vectors' && autoFocus + 1 < focusList.length;
+
+  /*
+   * 入力・単語分割から次へ進むときと、ベクトル画面を出し切って次のコンテンツへ行くときは
+   * 音声を最後まで聞かせてから動く。
+   */
   useAutoTimer({
-    enabled: auto && !busy,
+    enabled: auto && !busy && !moreFocus,
     audioEnded: audio.ended,
     sec: autoSec,
-    // ベクトル画面はフォーカスを移すたびに待ち直す
     key: `${phase}_${autoFocus}`,
     fire: () => {
       if (phase === 'input') return void run(content.autoText);
       if (phase === 'tokens') return void vectorize();
-      // ベクトル画面：指定された単語を順に見せ、最後まで行ったら次のコンテンツへ
-      const list = content.autoTokenIndexes ?? [];
-      if (autoFocus + 1 < list.length) {
-        setAutoFocus(autoFocus + 1);
-        setSelected(Math.min(Math.max(0, list[autoFocus + 1]), Math.max(0, tokens.length - 1)));
-        return;
-      }
       onFinish();
+    },
+  });
+
+  /*
+   * フォーカスの移動だけは音声を待たない。
+   * 1本のナレーションで複数の単語を順に説明する使い方を想定しているので、
+   * 鳴り終わるまで動かないと間に合わない。
+   */
+  useAutoTimer({
+    enabled: auto && !busy && moreFocus,
+    audioEnded: true,
+    sec: autoSec,
+    key: `focus_${autoFocus}`,
+    fire: () => {
+      const at = autoFocus + 1;
+      setAutoFocus(at);
+      setSelected(Math.min(Math.max(0, focusList[at]), Math.max(0, tokens.length - 1)));
     },
   });
 
