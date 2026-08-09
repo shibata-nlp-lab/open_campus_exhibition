@@ -499,6 +499,32 @@ export interface PlaybackState {
    * 進行係が「なぜ戻ったのか」を分かるように出す。飛んでいなければ null
    */
   returnTo: number | null;
+  /** 表示中の体験の様子（コントローラから操作するため）。体験以外を出しているときは null */
+  experience: ExperienceState | null;
+}
+
+/**
+ * 体験①②の様子。進行画面 → コントローラ に配信して、手元から
+ * 入力文の差し替え・フォーカスの移動・次の単語の選択をできるようにする。
+ */
+export interface ExperienceState {
+  kind: 'interactive1' | 'interactive2';
+  /** 体験①は input / tokens / vectors、体験②は input / predict / pick */
+  phase: string;
+  /** 設定に入れてある例文（そのままボタンにする） */
+  examples: string[];
+  /** いまの入力文。体験②は生成中の文全体 */
+  text: string;
+  /** その画面の主ボタンの文字（「単語に分ける」など）。押せる段階でなければ null */
+  runLabel: string | null;
+  /** 体験①：分けたあとの単語（フォーカス移動のボタンに出す） */
+  tokens: string[];
+  /** 体験①：いまフォーカスしている単語の位置 */
+  focus: number;
+  /** 体験②：いまの候補（選ばせるボタンに出す） */
+  candidates: Array<{ token: string; prob: number }>;
+  /** 読み込み中。押しても効かないのでボタンを止める */
+  busy: boolean;
 }
 
 export type PlaybackCommand =
@@ -522,4 +548,15 @@ export type PlaybackCommand =
   /** ポン出しを鳴らす。同じ id をもう一度送ると止まる */
   | { type: 'cue'; id: string }
   /** 鳴っているポン出しを全部止める */
-  | { type: 'cueStop' };
+  | { type: 'cueStop' }
+  /* --- 体験の操作。表示中の体験（interactive1 / interactive2）だけが受け取る --- */
+  /** 入力欄に文を入れる（実行はしない。来場者に見せながら選ぶため） */
+  | { type: 'expText'; text: string }
+  /** その画面の主ボタンを押す（単語に分ける / ベクトルにする / 予想させる） */
+  | { type: 'expRun' }
+  /** 体験①：フォーカスする単語を変える */
+  | { type: 'expFocus'; index: number }
+  /** 体験②：次の単語を選ぶ */
+  | { type: 'expPick'; index: number }
+  /** 入力画面からやり直す */
+  | { type: 'expReset' };

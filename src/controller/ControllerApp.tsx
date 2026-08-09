@@ -3,6 +3,7 @@ import type { AppConfig, DisplayInfo, PlaybackState } from '../types';
 import { CONTENT_LABELS } from '../defaults';
 import { api } from '../lib/api';
 import AttributePanel from './AttributePanel';
+import ExperiencePanel from './ExperiencePanel';
 import NextStartPanel from './NextStartPanel';
 
 /** 本体画面に出す進行コントローラ。進行画面（外部モニター）を手元から操作する */
@@ -173,6 +174,9 @@ export default function ControllerApp() {
           ⟲ 最初から
         </button>
       </div>
+
+      {/* 体験を出している間だけ現れる。進行の操作の次に使うものなので、ここに置く */}
+      <ExperiencePanel state={state} />
 
       <section className={`standby-panel ${state.standby ? 'on' : ''}`}>
         <div className="row" style={{ marginBottom: 10 }}>

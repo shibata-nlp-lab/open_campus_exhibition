@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { AppConfig, Content, ResultRecord, StandbyContent } from '../types';
+import type { AppConfig, Content, ExperienceState, ResultRecord, StandbyContent } from '../types';
 import { api } from '../lib/api';
 import { findBranchTarget } from '../lib/branch';
 import VideoStep from './VideoStep';
@@ -24,6 +24,8 @@ export interface StepProps<T extends Content = Content> {
   record: (kind: ResultRecord['kind'], payload: unknown) => void;
   /** コントローラに出すコンテンツ内部の進捗（任意） */
   onDetail?: (detail: string | null) => void;
+  /** 体験の様子をコントローラへ渡す（体験①②だけ使う） */
+  onExperience?: (state: ExperienceState | null) => void;
   /** 何回目の表示か（やり直し時に内部状態をリセットするため） */
   runKey: number;
 }
@@ -50,6 +52,8 @@ export default function PlayerApp({
   const [index, setIndex] = useState(0);
   const [runKey, setRunKey] = useState(0);
   const [detail, setDetail] = useState<string | null>(null);
+  /** 表示中の体験の様子。コントローラの操作パネルはこれを見て出る */
+  const [experience, setExperience] = useState<ExperienceState | null>(null);
   const [standby, setStandby] = useState(startStandby);
   const [standbyMuted, setStandbyMuted] = useState(false);
   /** コントローラ画面が開いているか。開いていれば来場者側に操作ボタンは出さない */
@@ -242,6 +246,7 @@ export default function PlayerApp({
       muteAll,
       auto,
       cue: cue.playing,
+      experience,
     };
     const json = JSON.stringify(state);
     if (json === publishedRef.current) return;
@@ -261,6 +266,7 @@ export default function PlayerApp({
     muteAll,
     auto,
     cue.playing,
+    experience,
   ]);
 
   if (!config) return <div className="player" />;
@@ -296,6 +302,7 @@ export default function PlayerApp({
       });
     },
     onDetail: setDetail,
+    onExperience: setExperience,
     runKey,
   };
 
