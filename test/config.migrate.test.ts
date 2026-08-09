@@ -112,11 +112,11 @@ describe('migrate — 新しく増えたフィールドの補完', () => {
   it('体験②の予測の取得元は、既存の設定では OpenAI のまま（勝手にローカルへ切り替えない）', () => {
     const cfg = migrate(base({ contents: [{ id: 'c1', type: 'interactive2', name: '体験' } as never] }));
     expect((cfg.contents[0] as Interactive2Content).predictSource).toBe('openai');
-    // サイズを空のままにすると、選択肢の無い select になって直せなくなる
-    expect((cfg.contents[0] as Interactive2Content).llmjpNextSize).toBe('150m');
+    // モデルを空のままにすると、選択肢の無い select になって直せなくなる
+    expect((cfg.contents[0] as Interactive2Content).predictModelId).toBe('150m');
   });
 
-  it('体験②で選んだモデルサイズは残す', () => {
+  it('v0.3.0 の llmjpNextSize / predictSource:llmjp を読み替える', () => {
     const cfg = migrate(
       base({
         contents: [
@@ -124,14 +124,18 @@ describe('migrate — 新しく増えたフィールドの補完', () => {
         ],
       })
     );
-    expect((cfg.contents[0] as Interactive2Content).llmjpNextSize).toBe('980m');
+    const c = cfg.contents[0] as Interactive2Content;
+    expect(c.predictSource).toBe('local');
+    expect(c.predictModelId).toBe('980m');
+    // 旧フィールドは残さない（両方見て食い違うのを防ぐ）
+    expect('llmjpNextSize' in c).toBe(false);
   });
 
-  it('体験②で llm-jp を選んでいれば、そのまま残す', () => {
+  it('体験②でローカルモデルを選んでいれば、そのまま残す', () => {
     const cfg = migrate(
-      base({ contents: [{ id: 'c1', type: 'interactive2', name: '体験', predictSource: 'llmjp' } as never] })
+      base({ contents: [{ id: 'c1', type: 'interactive2', name: '体験', predictSource: 'local' } as never] })
     );
-    expect((cfg.contents[0] as Interactive2Content).predictSource).toBe('llmjp');
+    expect((cfg.contents[0] as Interactive2Content).predictSource).toBe('local');
   });
 
   it('設定済みの画面の音声は残したまま、足りない画面だけ足す', () => {

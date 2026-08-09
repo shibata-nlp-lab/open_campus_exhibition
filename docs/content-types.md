@@ -192,7 +192,8 @@ PDF は pdfjs-dist でページ送りします。`autoAdvanceSec` は markdown /
 
 - interactive1 … 入力文をトークン分割 → ベクトル化 → 近いことば・ヒートマップ・PCA 2D
 - interactive2 … 次トークンの候補と確率を出し、来場者が選んで文を伸ばす。
-  取得元（`predictSource`）は OpenAI の `top_logprobs` か、**この PC で動かす llm-jp-3**（150m / 440m / 980m）の 2 通り
+  取得元（`predictSource`）は OpenAI の `top_logprobs` か、**この PC で動かす日本語モデル**
+  （llm-jp-3 の 150m / 440m / 980m と gemma-2-2b-jpn）の 2 通り
 
 トークナイザと埋め込みの選択肢は [nlp.md](nlp.md) にまとめています。
 

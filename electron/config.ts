@@ -103,8 +103,14 @@ export function migrate(config: AppConfig): AppConfig {
     }
     if (c.type === 'interactive2') {
       c.screenAudio = { ...emptyInteractive2Audio(), ...(c.screenAudio ?? {}) };
+      // llm-jp 以外（gemma）も選べるようにしたので、'llmjp' / llmjpNextSize から名前を変えた。
+      // v0.3.0 で書かれた config を読み替える
+      const old = c as unknown as { predictSource?: string; llmjpNextSize?: string };
+      if (old.predictSource === 'llmjp') c.predictSource = 'local';
+      if (old.llmjpNextSize && !c.predictModelId) c.predictModelId = old.llmjpNextSize as typeof c.predictModelId;
+      delete old.llmjpNextSize;
       c.predictSource ??= 'openai';
-      c.llmjpNextSize ??= '150m';
+      c.predictModelId ??= '150m';
     }
     if (c.type === 'branch') {
       // 戻り先は当初 1 つだけ（targetContentId / goLabel）だった。複数置けるようにしたので、

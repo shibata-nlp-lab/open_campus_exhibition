@@ -159,19 +159,22 @@ export interface Interactive1Content extends ContentBase {
 /**
  * 次トークンの確率をどこから取るか。
  * - openai: Chat Completions の top_logprobs（多言語・要APIキー・要通信）
- * - llmjp:  llm-jp-3 をこの PC で動かす（APIキー不要・通信なし。初回だけモデルを取得）
+ * - local:  日本語モデルをこの PC で動かす（APIキー不要・通信なし。初回だけモデルを取得）
  */
-export type PredictSource = 'openai' | 'llmjp';
+export type PredictSource = 'openai' | 'local';
 
-/** 体験②で動かす llm-jp-3 のサイズ。大きいほど候補が「らしく」なるが、取得も推論も重い */
-export type LlmJpNextSize = '150m' | '440m' | '980m';
+/**
+ * ローカルで動かすモデル。大きいほど候補は納得しやすくなるが、取得も推論も重い。
+ * `gemma2b` だけ llm-jp ではなく Gemma 2 の日本語版。
+ */
+export type PredictModelId = '150m' | '440m' | '980m' | 'gemma2b';
 
 export interface Interactive2Content extends ContentBase {
   type: 'interactive2';
   /** 次トークンの確率の取得元 */
   predictSource: PredictSource;
-  /** predictSource==='llmjp' のときのモデルサイズ */
-  llmjpNextSize: LlmJpNextSize;
+  /** predictSource==='local' のときに動かすモデル */
+  predictModelId: PredictModelId;
   prompt: string;
   placeholder: string;
   examples: string[];
