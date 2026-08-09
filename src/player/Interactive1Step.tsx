@@ -11,6 +11,7 @@ import type {
 import type { StepProps } from './PlayerApp';
 import { useAudio } from './useAudio';
 import { useAuto, useAutoTimer } from './useAuto';
+import { useExperienceControl } from './useExperience';
 import { api, errText } from '../lib/api';
 import { isSubmitEnter } from '../lib/ime';
 import { listJapaneseTokens, tokenize, type Tok } from '../lib/tokenizer';
@@ -138,7 +139,12 @@ async function loadPool(source: NeighbourSource, spec: EmbedSpec): Promise<Pool>
   return pool;
 }
 
-export default function Interactive1Step({ content, config, onFinish }: StepProps<Interactive1Content>) {
+export default function Interactive1Step({
+  content,
+  config,
+  onFinish,
+  onExperience,
+}: StepProps<Interactive1Content>) {
   const [text, setText] = useState('');
   const [phase, setPhase] = useState<Phase>('input');
   const [tokens, setTokens] = useState<Tok[]>([]);
@@ -271,6 +277,33 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
       setPhase('vectors');
     }
   };
+
+  /* ---------- コントローラからの操作 ---------- */
+  useExperienceControl(
+    {
+      kind: 'interactive1',
+      phase,
+      examples: content.examples,
+      text,
+      // ベクトル画面はこれ以上進む先がないので、主ボタンは出さない（送りは「次へ」を使う）
+      runLabel: phase === 'input' ? '単語に分ける' : phase === 'tokens' ? 'ベクトルにする' : null,
+      tokens: tokens.map((t) => t.text),
+      focus: selected,
+      candidates: [],
+      busy,
+    },
+    {
+      setText,
+      run: () => {
+        if (phase === 'input') void run();
+        else if (phase === 'tokens') void vectorize();
+      },
+      focus: (i) => setSelected(Math.min(Math.max(0, i), Math.max(0, tokens.length - 1))),
+      // 画面の「入力しなおす」と同じ。打ち直せるように文はそのまま残す
+      reset: () => setPhase('input'),
+    },
+    onExperience
+  );
 
   /** 選んだ単語に意味が近いことばを、プール全体から探す */
   const neighbours = useMemo(() => {

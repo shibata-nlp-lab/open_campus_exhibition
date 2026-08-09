@@ -5,6 +5,7 @@ import { api, errText } from '../lib/api';
 import { isSubmitEnter } from '../lib/ime';
 import { useAudio } from './useAudio';
 import { useAuto, useAutoTimer } from './useAuto';
+import { useExperienceControl } from './useExperience';
 
 /** API が使えないときの簡易候補（デモ継続用） */
 function offlineCandidates(text: string, topK: number): TokenCandidate[] {
@@ -24,7 +25,12 @@ function offlineCandidates(text: string, topK: number): TokenCandidate[] {
   }));
 }
 
-export default function Interactive2Step({ content, config, onFinish }: StepProps<Interactive2Content>) {
+export default function Interactive2Step({
+  content,
+  config,
+  onFinish,
+  onExperience,
+}: StepProps<Interactive2Content>) {
   const [seed, setSeed] = useState('');
   const [started, setStarted] = useState(false);
   const [text, setText] = useState('');
@@ -130,6 +136,42 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
     },
   });
 
+  /* ---------- コントローラからの操作 ---------- */
+  const reset = () => {
+    setStarted(false);
+    setText('');
+    setCands([]);
+    setLastToken('');
+  };
+  useExperienceControl(
+    {
+      kind: 'interactive2',
+      phase,
+      examples: content.examples,
+      // 始まる前は入力欄、始まったあとは生成中の文を出す
+      text: started ? text : seed,
+      runLabel: started ? null : '予想させる',
+      tokens: [],
+      focus: 0,
+      // 1位固定（autoPickTop）のときは進行係にも選ばせない。画面と食い違うため
+      candidates: content.autoPickTop ? [] : cands.map((c) => ({ token: c.token, prob: c.prob })),
+      busy,
+    },
+    {
+      setText: setSeed,
+      run: () => {
+        if (!started) void start();
+      },
+      pick: (i) => {
+        if (busy || content.autoPickTop) return;
+        const c = cands[i];
+        if (c) void pick(c.token);
+      },
+      reset,
+    },
+    onExperience
+  );
+
   // 自動モード（設定の autoPickTop）：1位を一定間隔で採用
   useEffect(() => {
     if (!started || !content.autoPickTop || busy || cands.length === 0) return;
@@ -219,7 +261,7 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
       {error && !offline && <div className="banner error">{error}</div>}
 
       <div className="row">
-        <button className="btn lg" onClick={() => { setStarted(false); setText(''); setCands([]); setLastToken(''); }}>
+        <button className="btn lg" onClick={reset}>
           もう一度
         </button>
         <button className="btn lg primary" onClick={onFinish}>次へすすむ ▶</button>

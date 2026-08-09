@@ -125,6 +125,11 @@ OS が暗号化を提供しない環境では `plain:` プレフィックス付�
 `PlaybackCommand` の一覧は [src/types.ts](../src/types.ts) を参照。
 `next`/`prev` は**コンテンツ単位**、`advance`/`back` は**コンテンツ内部**（スライドのページなど）です。
 
+`exp*`（`expText` / `expRun` / `expFocus` / `expPick` / `expReset`）は**体験①②の中身**を動かします。
+新しいチャネルは足さず、表示中の体験が `playback.onCommand` を自分でも購読して受け取ります
+（[src/player/useExperience.ts](../src/player/useExperience.ts)）。折り返し `PlaybackState.experience`
+に入力文・単語・候補を載せて配信し、コントローラはそれを見てボタンを組み立てます。
+
 ## controller
 
 | API | チャネル | 説明 |
