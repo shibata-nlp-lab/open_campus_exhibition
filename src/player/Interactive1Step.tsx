@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type {
   EmbeddingSource,
   Interactive1Content,
@@ -10,6 +10,7 @@ import type {
 } from '../types';
 import type { StepProps } from './PlayerApp';
 import { useAudio } from './useAudio';
+import { useAuto, useAutoTimer } from './useAuto';
 import { api, errText } from '../lib/api';
 import { isSubmitEnter } from '../lib/ime';
 import { listJapaneseTokens, tokenize, type Tok } from '../lib/tokenizer';
@@ -158,10 +159,50 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
   const showId = content.showTokenId ?? true;
 
   // 画面ごとの音声。phase が変わると前の画面の音は止まり、次の音に切り替わる
-  useAudio(content.screenAudio?.[phase]);
+  const audio = useAudio(content.screenAudio?.[phase]);
 
-  const run = async () => {
-    const t = text.trim();
+  /* ---------- 自動モード ---------- */
+  const { auto } = useAuto();
+  /** ベクトル画面で何番目のフォーカスまで進んだか（autoTokenIndexes の位置） */
+  const [autoFocus, setAutoFocus] = useState(0);
+  const autoSec = content.screenAutoSec?.[phase];
+
+  // 入力は来場者ではなく設定から。表示も入るので、入力欄に文字が出た状態で分割へ進む
+  useEffect(() => {
+    if (auto && phase === 'input' && !text) setText(content.autoText ?? '');
+  }, [auto, phase, text, content.autoText]);
+
+  useAutoTimer({
+    enabled: auto && !busy,
+    audioEnded: audio.ended,
+    sec: autoSec,
+    // ベクトル画面はフォーカスを移すたびに待ち直す
+    key: `${phase}_${autoFocus}`,
+    fire: () => {
+      if (phase === 'input') return void run(content.autoText);
+      if (phase === 'tokens') return void vectorize();
+      // ベクトル画面：指定された単語を順に見せ、最後まで行ったら次のコンテンツへ
+      const list = content.autoTokenIndexes ?? [];
+      if (autoFocus + 1 < list.length) {
+        setAutoFocus(autoFocus + 1);
+        setSelected(Math.min(Math.max(0, list[autoFocus + 1]), Math.max(0, tokens.length - 1)));
+        return;
+      }
+      onFinish();
+    },
+  });
+
+  // ベクトル画面に入った時点で、最初に見せる単語へフォーカスを合わせる
+  useEffect(() => {
+    if (!auto || phase !== 'vectors') return;
+    const first = content.autoTokenIndexes?.[0] ?? 0;
+    setAutoFocus(0);
+    setSelected(Math.min(Math.max(0, first), Math.max(0, tokens.length - 1)));
+  }, [auto, phase, tokens.length, content.autoTokenIndexes]);
+
+  /** override は自動モード用。setText の反映を待たずに走らせるために渡す */
+  const run = async (override?: string) => {
+    const t = (override ?? text).trim();
     if (!t) return;
     setBusy(true);
     // llm-jp は語彙ファイル（約100,000語）の読み込み、Ruri は初回だけトークナイザの
@@ -277,7 +318,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
             ))}
           </div>
         )}
-        <button className="btn lg primary" onClick={run} disabled={!text.trim() || busy}>
+        <button className="btn lg primary" onClick={() => run()} disabled={!text.trim() || busy}>
           {busy ? '準備中…' : '単語に分けてみる ▶'}
         </button>
       </div>

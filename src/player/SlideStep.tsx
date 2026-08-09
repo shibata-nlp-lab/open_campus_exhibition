@@ -4,6 +4,7 @@ import type { SlideContent } from '../types';
 import type { StepProps } from './PlayerApp';
 import { api, errText } from '../lib/api';
 import { useAudio, useStepKeys } from './useAudio';
+import { useAuto } from './useAuto';
 import { DEFAULT_INTRO_MARKDOWN } from '../defaults';
 import { parseMarp, resolveRelativeAssets } from '../lib/markdown';
 import { isMarpDocument, renderMarp } from '../lib/marp';
@@ -262,6 +263,17 @@ function SlideBar({ page, total, onPrev, onNext }: { page: number; total: number
 
 export default function SlideStep({ content, config, onFinish, onDetail }: StepProps<SlideContent>) {
   const audio = useAudio(content.audio);
+  const { auto } = useAuto();
+  /**
+   * 自動モードでのページ送り。
+   * 音声が鳴っている間は 0（＝送らない）にしておき、鳴り終わってから動き出す。
+   * ページごとの秒数が未設定でも止まらないよう、コンテンツの待ち時間に落とす。
+   */
+  const autoSec = auto
+    ? audio.ended
+      ? content.autoAdvanceSec || content.autoSec || 0
+      : 0
+    : content.autoAdvanceSec;
   const [mdText, setMdText] = useState<string | null>(null);
   const [mdError, setMdError] = useState<string | null>(null);
   /** 設定画面で登録した自作テーマ CSS の中身 */
@@ -330,7 +342,7 @@ export default function SlideStep({ content, config, onFinish, onDetail }: StepP
           themes={themes}
           onEnd={onFinish}
           onBack={back}
-          autoSec={content.autoAdvanceSec}
+          autoSec={autoSec}
           baseDir={baseDir}
           onPage={(p, t) => onDetail?.(`${p} / ${t} ページ`)}
         />
@@ -341,7 +353,7 @@ export default function SlideStep({ content, config, onFinish, onDetail }: StepP
           src={mdText}
           onEnd={onFinish}
           onBack={back}
-          autoSec={content.autoAdvanceSec}
+          autoSec={autoSec}
           baseDir={baseDir}
           onPage={(p, t) => onDetail?.(`${p} / ${t} ページ`)}
         />
@@ -360,7 +372,7 @@ export default function SlideStep({ content, config, onFinish, onDetail }: StepP
         rel={content.src}
         onEnd={onFinish}
         onBack={back}
-        autoSec={content.autoAdvanceSec}
+        autoSec={autoSec}
         onPage={(p, t) => onDetail?.(`${p} / ${t} ページ`)}
       />
     );

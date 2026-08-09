@@ -20,14 +20,29 @@ export function useAudio(setting: AudioSetting | undefined, mutedExternal?: bool
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
 
+  /**
+   * 鳴り終わったか。自動モードは「音声が終わってから N 秒」で次へ進むので、
+   * 音声が無い・ループする・再生に失敗した場合は「終わっている」ものとして扱う
+   * （そうしないと自動モードが止まってしまう）。
+   */
+  const [ended, setEnded] = useState(!setting?.src);
+
   useEffect(() => {
-    if (!setting?.src) return;
+    if (!setting?.src) {
+      setEnded(true);
+      return;
+    }
+    setEnded(false);
     const el = new Audio(api.asset.url(setting.src));
     el.volume = setting.volume;
     el.loop = setting.loop;
     // 下の効果は muted が変わったときだけ走るので、初回はここで反映しないと鳴ってしまう
     el.muted = mutedRef.current;
-    el.play().catch(() => {});
+    // ループする音は終わりが来ないので、待たずに次へ進めてよいことにする
+    if (setting.loop) setEnded(true);
+    el.addEventListener('ended', () => setEnded(true));
+    // 再生できなかったとき（対応していない形式など）に自動モードを止めない
+    el.play().catch(() => setEnded(true));
     ref.current = el;
     return () => {
       el.pause();
@@ -43,6 +58,7 @@ export function useAudio(setting: AudioSetting | undefined, mutedExternal?: bool
   return {
     hasAudio: Boolean(setting?.src),
     muted,
+    ended,
     toggleMute: () => setMuted((m) => !m),
   };
 }

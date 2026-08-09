@@ -43,6 +43,20 @@ export const emptyInteractive1Audio = (): Interactive1Content['screenAudio'] => 
 export const emptyInteractive2Audio = (): Interactive2Content['screenAudio'] => ({
   input: emptyAudio(),
   predict: emptyAudio(),
+  pick: emptyAudio(),
+});
+
+/** 自動モードの待ち時間の既定値（秒）。音声が終わってからこれだけ置いて次へ */
+export const DEFAULT_AUTO_SEC = 4;
+export const defaultInteractive1AutoSec = (): Interactive1Content['screenAutoSec'] => ({
+  input: DEFAULT_AUTO_SEC,
+  tokens: DEFAULT_AUTO_SEC,
+  vectors: DEFAULT_AUTO_SEC,
+});
+export const defaultInteractive2AutoSec = (): Interactive2Content['screenAutoSec'] => ({
+  input: DEFAULT_AUTO_SEC,
+  predict: DEFAULT_AUTO_SEC,
+  pick: DEFAULT_AUTO_SEC,
 });
 
 /** コントローラで来場者の内訳を記録するときの既定の区分 */
@@ -70,7 +84,7 @@ export const CONTENT_LABELS: Record<ContentType, string> = {
 
 /** 各コンテンツ種別の空テンプレート */
 export function createContent(type: ContentType): Content {
-  const base = { id: uid(type), name: CONTENT_LABELS[type], note: '' };
+  const base = { id: uid(type), name: CONTENT_LABELS[type], note: '', autoSec: DEFAULT_AUTO_SEC };
   switch (type) {
     case 'video':
       return { ...base, type, src: null, muted: false, loop: false, autoAdvance: true } as VideoContent;
@@ -122,6 +136,9 @@ export function createContent(type: ContentType): Content {
         similarityDisplay: 'relative',
         showTokenId: true,
         screenAudio: emptyInteractive1Audio(),
+        screenAutoSec: defaultInteractive1AutoSec(),
+        autoText: '今日はオープンキャンパスに来ました',
+        autoTokenIndexes: [],
       } as Interactive1Content;
     case 'interactive2':
       return {
@@ -136,6 +153,10 @@ export function createContent(type: ContentType): Content {
         maxSteps: 12,
         autoPickTop: false,
         screenAudio: emptyInteractive2Audio(),
+        screenAutoSec: defaultInteractive2AutoSec(),
+        autoSeed: '今日の天気は',
+        autoPickIndex: 0,
+        autoPickCount: 5,
       } as Interactive2Content;
     case 'game':
       return {

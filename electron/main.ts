@@ -183,6 +183,8 @@ function attachControllerKeys(win: BrowserWindow) {
         return handled(() => sendToPlayer({ type: 'standby' }));
       case 'm':
         return handled(() => sendToPlayer({ type: 'muteAll' }));
+      case 'a':
+        return handled(() => sendToPlayer({ type: 'auto' }));
       case 'r':
         return handled(() => sendToPlayer({ type: 'restart' }));
       case 'f':
@@ -222,7 +224,7 @@ function createControllerWindow(scenarioId: string) {
   });
 }
 
-function createPlayerWindow(scenarioId: string, standby = false, muted = false) {
+function createPlayerWindow(scenarioId: string, standby = false, muted = false, auto = false) {
   const cfg = loadConfig();
   if (playerWindow && !playerWindow.isDestroyed()) {
     playerWindow.focus();
@@ -245,7 +247,7 @@ function createPlayerWindow(scenarioId: string, standby = false, muted = false) 
   });
   playerWindow.loadURL(
     rendererUrl(
-      `/player?scenario=${encodeURIComponent(scenarioId)}${standby ? '&standby=1' : ''}${muted ? '&mute=1' : ''}`
+      `/player?scenario=${encodeURIComponent(scenarioId)}${standby ? '&standby=1' : ''}${muted ? '&mute=1' : ''}${auto ? '&auto=1' : ''}`
     )
   );
 
@@ -475,8 +477,10 @@ function registerIpc() {
   );
 
   /* --- ウィンドウ / ディスプレイ --- */
-  ipcMain.handle('player:open', (_e, args: { scenarioId: string; standby?: boolean; muted?: boolean }) =>
-    createPlayerWindow(args.scenarioId, args.standby, args.muted)
+  ipcMain.handle(
+    'player:open',
+    (_e, args: { scenarioId: string; standby?: boolean; muted?: boolean; auto?: boolean }) =>
+      createPlayerWindow(args.scenarioId, args.standby, args.muted, args.auto)
   );
   ipcMain.handle('player:close', () => {
     playerWindow?.close();

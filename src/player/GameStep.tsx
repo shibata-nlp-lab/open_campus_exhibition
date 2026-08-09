@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { GameContent } from '../types';
 import type { StepProps } from './PlayerApp';
+import { useAuto, useAutoTimer } from './useAuto';
 
 export default function GameStep({ content, onFinish, record }: StepProps<GameContent>) {
+  // 自動モードは来場者が答えないので、待ち時間ぶんだけ見せて先へ進む（音声は持っていない）
+  const { auto } = useAuto();
+  useAutoTimer({ enabled: auto, audioEnded: true, sec: content.autoSec, fire: onFinish });
   const [phase, setPhase] = useState<'title' | 'play' | 'result'>('title');
   const [ri, setRi] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);

@@ -1,6 +1,7 @@
 import type { BranchContent } from '../types';
 import type { StepProps } from './PlayerApp';
 import { useAudio } from './useAudio';
+import { useAuto, useAutoTimer } from './useAuto';
 
 /** 実際に戻れる（シナリオ内に見つかった）戻り先 */
 export interface ResolvedTarget {
@@ -23,7 +24,14 @@ interface Props extends StepProps<BranchContent> {
  * 体験したい人だけを前の体験コンテンツへ戻し、終わったらここへ帰ってくる。
  */
 export default function BranchStep({ content, onFinish, targets, onJump }: Props) {
-  useAudio(content.audio);
+  const audio = useAudio(content.audio);
+  const { auto, toStandby } = useAuto();
+  /*
+   * 自動モードで誰も「体験する」を押さなかったら、次のコンテンツではなく待機画面へ移る。
+   * 無人のまま説明が続いてしまうのを避けるため。
+   * 押された場合は PlayerApp 側で自動モードを解除する（人が操作を引き取ったので）。
+   */
+  useAutoTimer({ enabled: auto, audioEnded: audio.ended, sec: content.autoSec, fire: toStandby });
 
   return (
     <div className="stage entry fade-in">

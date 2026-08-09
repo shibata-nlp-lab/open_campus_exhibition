@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import type { Content, ContentType } from '../types';
-import { CONTENT_LABELS, createContent, uid } from '../defaults';
+import { CONTENT_LABELS, createContent, DEFAULT_AUTO_SEC, uid } from '../defaults';
 import { ContentEditor } from './editors';
-import { Field, type PanelProps } from './common';
+import { Field, NumberField, type PanelProps } from './common';
 
 const TYPES = Object.keys(CONTENT_LABELS) as ContentType[];
 /** 1つだけあれば足りる種別（重複作成は可能だが新規追加メニューでは注意書きを出す） */
@@ -122,6 +122,16 @@ export default function ContentPanel({ config, update }: PanelProps) {
             <Field label="進行メモ（任意・コントローラ画面にのみ表示）">
               <input className="input" value={content.note ?? ''} onChange={(e) => patch((c) => void (c.note = e.target.value))} />
             </Field>
+            {/* 体験①②は画面ごとに待ち時間を持つので、こちらの共通欄は出さない */}
+            {content.type !== 'interactive1' && content.type !== 'interactive2' && (
+              <NumberField
+                label="自動モードの待ち時間"
+                value={content.autoSec ?? DEFAULT_AUTO_SEC}
+                max={600}
+                suffix="秒（音声が鳴り終わってから次へ。自動モードのときだけ使います）"
+                onChange={(v) => patch((c) => void (c.autoSec = v))}
+              />
+            )}
 
             <hr style={{ border: 0, borderTop: '1px solid var(--line)', margin: '16px 0' }} />
 

@@ -10,7 +10,7 @@ import type {
   SlideContent,
   StandbyContent,
 } from '../src/types';
-import { DEFAULT_ATTRIBUTE_OPTIONS, SAMPLES_VERSION } from '../src/defaults';
+import { DEFAULT_ATTRIBUTE_OPTIONS, DEFAULT_AUTO_SEC, SAMPLES_VERSION } from '../src/defaults';
 
 // config.ts は app.getPath('userData') を使うので、一時ディレクトリに差し替える
 const tmp = path.join(os.tmpdir(), 'oc-test-' + Math.random().toString(36).slice(2));
@@ -104,9 +104,43 @@ describe('migrate — 新しく増えたフィールドの補完', () => {
     for (const s of Object.values(a)) expect(s.src).toBeNull();
   });
 
-  it('体験②の画面ごとの音声を、2画面ぶん空で用意する', () => {
+  it('体験②の画面ごとの音声を、3画面ぶん空で用意する', () => {
     const cfg = migrate(base({ contents: [{ id: 'c1', type: 'interactive2', name: '体験' } as never] }));
-    expect(Object.keys((cfg.contents[0] as Interactive2Content).screenAudio).sort()).toEqual(['input', 'predict']);
+    expect(Object.keys((cfg.contents[0] as Interactive2Content).screenAudio).sort()).toEqual([
+      'input',
+      'pick',
+      'predict',
+    ]);
+  });
+
+  it('自動モードの待ち時間を、コンテンツと画面それぞれに入れる', () => {
+    const cfg = migrate(
+      base({
+        contents: [
+          { id: 'c1', type: 'slide', name: 'スライド' } as never,
+          { id: 'c2', type: 'interactive1', name: '体験①' } as never,
+          { id: 'c3', type: 'interactive2', name: '体験②' } as never,
+        ],
+      })
+    );
+    expect(cfg.contents[0].autoSec).toBe(DEFAULT_AUTO_SEC);
+    expect((cfg.contents[1] as Interactive1Content).screenAutoSec.vectors).toBe(DEFAULT_AUTO_SEC);
+    expect((cfg.contents[2] as Interactive2Content).screenAutoSec.pick).toBe(DEFAULT_AUTO_SEC);
+  });
+
+  it('自分で入れた待ち時間は残す。0 秒（音声の直後に進む）も潰さない', () => {
+    const cfg = migrate(
+      base({
+        contents: [
+          { id: 'c1', type: 'slide', name: 'スライド', autoSec: 0 } as never,
+          { id: 'c2', type: 'interactive1', name: '体験①', screenAutoSec: { tokens: 12 } } as never,
+        ],
+      })
+    );
+    expect(cfg.contents[0].autoSec).toBe(0);
+    const sec = (cfg.contents[1] as Interactive1Content).screenAutoSec;
+    expect(sec.tokens).toBe(12);
+    expect(sec.input).toBe(DEFAULT_AUTO_SEC);
   });
 
   it('体験②の予測の取得元は、既存の設定では OpenAI のまま（勝手にローカルへ切り替えない）', () => {
