@@ -175,6 +175,12 @@ export interface Interactive1Content extends ContentBase {
    * 空なら先頭の単語だけを見せる。
    */
   autoTokenIndexes: number[];
+  /**
+   * 自動モードで、単語から単語へフォーカスを移す間隔（秒）。
+   * こちらは**音声の終わりを待たない**（1本のナレーションで複数の単語を説明する想定）。
+   * 最後の単語まで見せたあと次のコンテンツへ進むときは screenAutoSec.vectors を使う。
+   */
+  autoFocusSec: number;
 }
 
 /**

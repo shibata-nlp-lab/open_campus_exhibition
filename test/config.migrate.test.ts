@@ -143,6 +143,21 @@ describe('migrate — 新しく増えたフィールドの補完', () => {
     expect(sec.input).toBe(DEFAULT_AUTO_SEC);
   });
 
+  it('フォーカス移動の間隔は、それまで使っていたベクトル画面の待ち時間を引き継ぐ', () => {
+    // v0.5.0 まではベクトル画面の待ち時間を流用していたので、設定し直さなくても同じ動きになる
+    const cfg = migrate(
+      base({
+        contents: [{ id: 'c1', type: 'interactive1', name: '体験', screenAutoSec: { vectors: 7 } } as never],
+      })
+    );
+    expect((cfg.contents[0] as Interactive1Content).autoFocusSec).toBe(7);
+  });
+
+  it('引き継ぐ値も無ければ既定値にする', () => {
+    const cfg = migrate(base({ contents: [{ id: 'c1', type: 'interactive1', name: '体験' } as never] }));
+    expect((cfg.contents[0] as Interactive1Content).autoFocusSec).toBe(DEFAULT_AUTO_SEC);
+  });
+
   it('体験②の予測の取得元は、既存の設定では OpenAI のまま（勝手にローカルへ切り替えない）', () => {
     const cfg = migrate(base({ contents: [{ id: 'c1', type: 'interactive2', name: '体験' } as never] }));
     expect((cfg.contents[0] as Interactive2Content).predictSource).toBe('openai');
