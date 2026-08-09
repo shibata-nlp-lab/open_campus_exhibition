@@ -1,6 +1,6 @@
 {
   "name": "open-campus-llm-exhibit",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "オープンキャンパス向け LLM 解説展示アプリ",
   "main": "dist/main/main.js",
