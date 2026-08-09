@@ -204,7 +204,7 @@ PDF は pdfjs-dist でページ送りします。`autoAdvanceSec` は markdown /
 | type | キー | 画面 |
 | --- | --- | --- |
 | `interactive1` | `input` / `tokens` / `vectors` | 入力 ／ STEP 1 単語分割 ／ STEP 2 ベクトル化 |
-| `interactive2` | `input` / `predict` | 入力 ／ 予測中 |
+| `interactive2` | `input` / `predict` / `pick` | 入力 ／ 最初の候補が出た画面 ／ 1語選んだあと |
 
 `src` が空の画面では何も鳴りません。画面が切り替わると前の画面の音は止まります
 （`useAudio` の依存が `src` なので、React が前の再生を後片付けしてから次を鳴らします）。
@@ -232,6 +232,14 @@ PDF は pdfjs-dist でページ送りします。`autoAdvanceSec` は markdown /
 | `interactive1` | `autoText` を入力 → 分割 → ベクトル化 → `autoTokenIndexes` を順にフォーカス → 次へ | `screenAutoSec[phase]` |
 | `interactive2` | `autoSeed` を入力 → `autoPickIndex` の候補を `autoPickCount` 回選ぶ → 次へ | `screenAutoSec[phase]` |
 | `branch` | 誰も押さなければ**待機画面へ**（次のコンテンツへは進めない） | `autoSec` |
+
+体験①の**フォーカス移動だけは音声の終わりを待ちません**（`audioEnded: true` を渡す別のタイマー）。
+1本のナレーションで複数の単語を順に説明する想定なので、鳴り終わるまで動かないと間に合いません。
+最後の単語まで見せたあと、次のコンテンツへ進むときは音声の終わりを待ちます。
+
+**自動モード中はコントローラの進行操作を止めます。** ボタンは `disabled`、キーは
+メインプロセス側（`before-input-event`）で握りつぶします。**ボタンだけ止めてキーが通ると、
+うっかり触って二重に進みます。** 解除（`A`）・全画面（`F`）・終了（`Esc`）だけは通します。
 
 **分岐で「体験する」が押されたら自動モードを解除します**（`AutoContext.cancel`）。
 人が操作を引き取ったのに裏で勝手に画面が進むのを避けるためです。

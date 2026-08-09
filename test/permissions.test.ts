@@ -12,7 +12,7 @@ import {
 } from '../src/permissions';
 
 const ROLES: Role[] = ['owner', 'admin', 'editor', 'user'];
-const TABS: SettingsTab[] = ['scenario', 'content', 'general', 'api', 'results', 'users'];
+const TABS: SettingsTab[] = ['scenario', 'content', 'cues', 'general', 'api', 'results', 'users'];
 
 describe('タブのアクセス', () => {
   it('オーナーはすべてのタブを開ける', () => {
@@ -27,6 +27,8 @@ describe('タブのアクセス', () => {
   it('エディターはシナリオとコンテンツだけ', () => {
     expect(canOpenTab('editor', 'scenario')).toBe(true);
     expect(canOpenTab('editor', 'content')).toBe(true);
+    // ポン出しは当日の進行で使うので、展示を作る人（editor）も触れる
+    expect(canOpenTab('editor', 'cues')).toBe(true);
     for (const t of ['general', 'api', 'results', 'users'] as SettingsTab[]) {
       expect(canOpenTab('editor', t)).toBe(false);
     }

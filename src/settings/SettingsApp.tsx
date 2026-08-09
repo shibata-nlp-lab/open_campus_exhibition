@@ -6,6 +6,7 @@ import { canOpenSettings, canOpenTab, type SettingsTab } from '../permissions';
 import { useConfig } from './useConfig';
 import ScenarioPanel from './ScenarioPanel';
 import ContentPanel from './ContentPanel';
+import CuesPanel from './CuesPanel';
 import ApiPanel from './ApiPanel';
 import ResultsPanel from './ResultsPanel';
 import GeneralPanel from './GeneralPanel';
@@ -15,6 +16,7 @@ import LoginScreen from './LoginScreen';
 const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'scenario', label: 'シナリオ' },
   { id: 'content', label: 'コンテンツ' },
+  { id: 'cues', label: 'ポン出し' },
   { id: 'general', label: '全般' },
   { id: 'api', label: 'API' },
   { id: 'results', label: '集計結果' },
@@ -111,6 +113,7 @@ export default function SettingsApp() {
       <main className="main">
         {active === 'scenario' && <ScenarioPanel config={config} update={update} flush={flush} />}
         {active === 'content' && <ContentPanel config={config} update={update} />}
+        {active === 'cues' && <CuesPanel config={config} update={update} />}
         {active === 'general' && <GeneralPanel config={config} update={update} />}
         {active === 'api' && <ApiPanel config={config} update={update} />}
         {active === 'results' && <ResultsPanel />}

@@ -345,6 +345,23 @@ export interface AppSettings {
   attributeOptions: string[];
   /** Marp の自作テーマ CSS（絶対パス）。`marp: true` のスライドで theme: に指定できる */
   marpThemes: string[];
+  /** コントローラから手で鳴らす音（ポン出し）。並べた順にボタンが出る */
+  cues: CueSound[];
+}
+
+/**
+ * ポン出しの1音。コントローラのボタンを押した瞬間に進行画面で鳴る。
+ * コンテンツの音声とは別枠で、重ねて鳴らす（拍手・ジングルなどを想定）。
+ */
+export interface CueSound {
+  id: string;
+  /** ボタンに出す名前 */
+  label: string;
+  /** assets 相対パス */
+  src: string | null;
+  volume: number; // 0..1
+  /** BGM として流しっぱなしにするなら true（もう一度押すと止まる） */
+  loop: boolean;
 }
 
 export interface AppConfig {
@@ -462,6 +479,8 @@ export interface PlaybackState {
   muteAll: boolean;
   /** 自動モードで動いているか（A キーで切り替わる） */
   auto: boolean;
+  /** いま鳴っているポン出しの id（鳴っていなければ null） */
+  cue: string | null;
   /** いま効いている待機画面の「次の回のはじまり」（コントローラから編集するため） */
   standbyNext: { contentId: string; mode: NextStartMode; time: string };
   /**
@@ -488,4 +507,8 @@ export type PlaybackCommand =
   /** 進行画面の音をまとめて止める / 戻す（省略時はトグル） */
   | { type: 'muteAll'; on?: boolean }
   /** 自動モードの入り / 切り（省略時はトグル） */
-  | { type: 'auto'; on?: boolean };
+  | { type: 'auto'; on?: boolean }
+  /** ポン出しを鳴らす。同じ id をもう一度送ると止まる */
+  | { type: 'cue'; id: string }
+  /** 鳴っているポン出しを全部止める */
+  | { type: 'cueStop' };

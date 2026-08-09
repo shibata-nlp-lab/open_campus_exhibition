@@ -369,6 +369,7 @@ export function createDefaultConfig(): AppConfig {
       showController: true,
       attributeOptions: DEFAULT_ATTRIBUTE_OPTIONS.slice(),
       marpThemes: [],
+      cues: [],
     },
     contents,
     scenarios: [full, short],

@@ -97,8 +97,6 @@ export function migrate(config: AppConfig): AppConfig {
       c.screenAutoSec = { ...defaultInteractive1AutoSec(), ...(c.screenAutoSec ?? {}) };
       c.autoText ??= c.examples?.[0] ?? '';
       if (!Array.isArray(c.autoTokenIndexes)) c.autoTokenIndexes = [];
-    }
-    if (c.type === 'interactive1') {
       c.neighbourSource ??= 'curated';
       c.tokenizerMode ??= 'gpt';
       c.embeddingSource ??= 'openai';
@@ -165,6 +163,7 @@ export function migrate(config: AppConfig): AppConfig {
     config.settings.attributeOptions = DEFAULT_ATTRIBUTE_OPTIONS.slice();
   }
   if (!Array.isArray(config.settings.marpThemes)) config.settings.marpThemes = [];
+  if (!Array.isArray(config.settings.cues)) config.settings.cues = [];
 
   // 同梱サンプルが更新されていたら取り込む
   if ((config.samplesVersion ?? 0) < SAMPLES_VERSION) {

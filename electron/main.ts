@@ -161,14 +161,21 @@ function attachControllerKeys(win: BrowserWindow) {
       event.preventDefault();
       fn();
     };
+    /*
+     * 自動モード中は進行の操作を受け付けない（コントローラのボタンと同じ扱い）。
+     * ボタンだけ止めてキーが通ると、うっかり触って二重に進んでしまう。
+     * 解除（A）・全画面（F）・終了（Esc）だけは残す。
+     */
+    const auto = Boolean(lastPlaybackState?.auto);
+    const unlessAuto = (fn: () => void) => handled(() => !auto && fn());
 
     switch (input.key) {
       case 'ArrowRight':
       case 'PageDown':
-        return handled(() => sendToPlayer({ type: 'advance' }));
+        return unlessAuto(() => sendToPlayer({ type: 'advance' }));
       case 'ArrowLeft':
       case 'PageUp':
-        return handled(() => sendToPlayer({ type: 'back' }));
+        return unlessAuto(() => sendToPlayer({ type: 'back' }));
       case 'Escape':
         return handled(() => playerWindow?.close());
     }
@@ -176,17 +183,17 @@ function attachControllerKeys(win: BrowserWindow) {
     // input.key は IME の状態によらず物理キーに対応した文字が入る
     switch (input.key.toLowerCase()) {
       case 'n':
-        return handled(() => sendToPlayer({ type: 'next' }));
+        return unlessAuto(() => sendToPlayer({ type: 'next' }));
       case 'p':
-        return handled(() => sendToPlayer({ type: 'prev' }));
+        return unlessAuto(() => sendToPlayer({ type: 'prev' }));
       case 's':
-        return handled(() => sendToPlayer({ type: 'standby' }));
+        return unlessAuto(() => sendToPlayer({ type: 'standby' }));
       case 'm':
         return handled(() => sendToPlayer({ type: 'muteAll' }));
       case 'a':
         return handled(() => sendToPlayer({ type: 'auto' }));
       case 'r':
-        return handled(() => sendToPlayer({ type: 'restart' }));
+        return unlessAuto(() => sendToPlayer({ type: 'restart' }));
       case 'f':
         return handled(() => {
           if (playerWindow && !playerWindow.isDestroyed()) playerWindow.setFullScreen(!playerWindow.isFullScreen());

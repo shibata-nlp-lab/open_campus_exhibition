@@ -8,11 +8,12 @@
 import { ROLE_RANK, type Role } from './types';
 
 /** 設定画面のタブ */
-export type SettingsTab = 'scenario' | 'content' | 'general' | 'api' | 'results' | 'users';
+export type SettingsTab = 'scenario' | 'content' | 'cues' | 'general' | 'api' | 'results' | 'users';
 
 const TAB_ALLOW: Record<SettingsTab, Role[]> = {
   scenario: ['owner', 'admin', 'editor'],
   content: ['owner', 'admin', 'editor'],
+  cues: ['owner', 'admin', 'editor'],
   general: ['owner', 'admin'],
   api: ['owner'], // APIキーを扱うのでオーナーだけ
   results: ['owner', 'admin'],
