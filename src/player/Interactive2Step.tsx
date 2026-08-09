@@ -50,8 +50,8 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
   // llm-jp は初回だけモデルの読み込み（キャッシュ済みで 0.5 秒ほど、未取得ならダウンロード）が
   // 入る。来場者が入力している間に済ませておく
   useEffect(() => {
-    if (content.predictSource === 'llmjp') api.llmjp.prepareNext().catch(() => {});
-  }, [content.predictSource]);
+    if (content.predictSource === 'llmjp') api.llmjp.prepareNext(content.llmjpNextSize ?? '150m').catch(() => {});
+  }, [content.predictSource, content.llmjpNextSize]);
 
   const fetchCands = useCallback(
     async (current: string) => {
@@ -60,7 +60,7 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
       try {
         const c =
           content.predictSource === 'llmjp'
-            ? await api.llmjp.nextTokens(current, content.topK)
+            ? await api.llmjp.nextTokens(current, content.topK, content.llmjpNextSize ?? '150m')
             : await api.openai.nextTokens(current, content.topK, config.settings.chatModel);
         if (!alive.current) return;
         setCands(c);
@@ -74,7 +74,7 @@ export default function Interactive2Step({ content, config, onFinish }: StepProp
         if (alive.current) setBusy(false);
       }
     },
-    [content.topK, content.predictSource, config.settings.chatModel]
+    [content.topK, content.predictSource, content.llmjpNextSize, config.settings.chatModel]
   );
 
   const start = async () => {

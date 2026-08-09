@@ -104,6 +104,7 @@ export function migrate(config: AppConfig): AppConfig {
     if (c.type === 'interactive2') {
       c.screenAudio = { ...emptyInteractive2Audio(), ...(c.screenAudio ?? {}) };
       c.predictSource ??= 'openai';
+      c.llmjpNextSize ??= '150m';
     }
     if (c.type === 'standby') {
       c.nextStartMode ??= 'hidden';
