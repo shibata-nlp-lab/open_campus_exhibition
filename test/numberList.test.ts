@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatIndexList, parseIndexList } from '../src/lib/indexList';
+import { formatIndexList, formatSecList, parseIndexList, parseSecList } from '../src/lib/numberList';
 
 describe('parseIndexList', () => {
   it('画面の 1 番目を 0 として読む', () => {
@@ -46,6 +46,36 @@ describe('formatIndexList', () => {
   it('往復しても変わらない', () => {
     for (const text of ['1, 3, 5', '2', '10, 1']) {
       expect(formatIndexList(parseIndexList(text))).toBe(text);
+    }
+  });
+});
+
+describe('parseSecList — 単語ごとの見せる時間', () => {
+  it('位置と違ってずらさない', () => {
+    expect(parseSecList('3, 5, 2')).toEqual([3, 5, 2]);
+  });
+
+  it('0 を残す（待たずに次の単語へ移る指定）', () => {
+    expect(parseSecList('0, 3')).toEqual([0, 3]);
+  });
+
+  it('小数を受け付ける', () => {
+    expect(parseSecList('1.5, 2.25')).toEqual([1.5, 2.25]);
+  });
+
+  it('打ちかけでもそこまでを拾う', () => {
+    expect(parseSecList('3,')).toEqual([3]);
+    expect(parseSecList('3, ')).toEqual([3]);
+  });
+
+  it('空なら空', () => {
+    expect(parseSecList('')).toEqual([]);
+    expect(parseSecList('.')).toEqual([]);
+  });
+
+  it('往復しても変わらない', () => {
+    for (const text of ['3, 5, 2', '0', '1.5']) {
+      expect(formatSecList(parseSecList(text))).toBe(text);
     }
   });
 });

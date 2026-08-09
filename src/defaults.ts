@@ -140,6 +140,7 @@ export function createContent(type: ContentType): Content {
         autoText: '今日はオープンキャンパスに来ました',
         autoTokenIndexes: [],
         autoFocusSec: DEFAULT_AUTO_SEC,
+        autoFocusSecs: [],
       } as Interactive1Content;
     case 'interactive2':
       return {

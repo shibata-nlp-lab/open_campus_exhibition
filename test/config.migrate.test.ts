@@ -156,6 +156,15 @@ describe('migrate — 新しく増えたフィールドの補完', () => {
   it('引き継ぐ値も無ければ既定値にする', () => {
     const cfg = migrate(base({ contents: [{ id: 'c1', type: 'interactive1', name: '体験' } as never] }));
     expect((cfg.contents[0] as Interactive1Content).autoFocusSec).toBe(DEFAULT_AUTO_SEC);
+    // 単語ごとの時間は「指定なし」から始める（既定の間隔がそのまま使われる）
+    expect((cfg.contents[0] as Interactive1Content).autoFocusSecs).toEqual([]);
+  });
+
+  it('単語ごとの見せる時間は残す', () => {
+    const cfg = migrate(
+      base({ contents: [{ id: 'c1', type: 'interactive1', name: '体験', autoFocusSecs: [3, 5, 2] } as never] })
+    );
+    expect((cfg.contents[0] as Interactive1Content).autoFocusSecs).toEqual([3, 5, 2]);
   });
 
   it('体験②の予測の取得元は、既存の設定では OpenAI のまま（勝手にローカルへ切り替えない）', () => {

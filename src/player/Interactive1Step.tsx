@@ -200,7 +200,8 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
   useAutoTimer({
     enabled: auto && !busy && moreFocus,
     audioEnded: true,
-    sec: content.autoFocusSec,
+    // 単語ごとに時間を決めていればそれを使い、無ければ共通の間隔
+    sec: content.autoFocusSecs?.[autoFocus] ?? content.autoFocusSec,
     key: `focus_${autoFocus}`,
     fire: () => {
       const at = autoFocus + 1;
