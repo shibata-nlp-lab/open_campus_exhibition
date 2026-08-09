@@ -8,7 +8,7 @@ const ROLE_HELP: Record<Role, string> = {
   owner: 'すべての管理画面。他のユーザーの権限も変更できます。',
   admin: 'API 以外の管理画面。エディターとユーザーの権限を変更できます。',
   editor: 'シナリオとコンテンツのみ。展示の中身を作る担当者向け。',
-  user: '既存シナリオの実行のみ。管理画面は開けません。当日の展示員向け。',
+  user: '既存シナリオの実行のみ（始め方は4つとも選べます）。管理画面は開けません。当日の展示員向け。',
 };
 
 export default function UsersPanel({ me, onChanged }: { me: UserInfo | null; onChanged: () => void }) {

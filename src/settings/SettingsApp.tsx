@@ -3,6 +3,7 @@ import type { AuthState, Role } from '../types';
 import { ROLE_LABELS } from '../types';
 import { api } from '../lib/api';
 import { canOpenSettings, canOpenTab, type SettingsTab } from '../permissions';
+import { PLAY_MODES } from '../playModes';
 import { useConfig } from './useConfig';
 import ScenarioPanel from './ScenarioPanel';
 import ContentPanel from './ContentPanel';
@@ -48,20 +49,38 @@ export default function SettingsApp() {
   const role: Role = auth.current?.role ?? 'owner';
   const visible = TABS.filter((t) => canOpenTab(role, t.id));
 
-  // 「ユーザー」権限は管理画面を開けない。シナリオの実行だけできる画面を出す
+  // 「ユーザー」権限は管理画面を開けない。シナリオの実行だけできる画面を出す。
+  // 始め方（自動・音声なし・待機画面）は当日の状況で変わるので、編集権限がなくても全部選べる
   if (!canOpenSettings(role)) {
     const scenarios = config.scenarios;
     return (
       <div className="launcher">
         <h1>🧠 {config.settings.exhibitTitle}</h1>
         <p className="small muted">
-          {auth.current?.name}さん（{ROLE_LABELS[role]}）— シナリオを選んで開始してください。
+          {auth.current?.name}さん（{ROLE_LABELS[role]}）— シナリオと始め方を選んでください。
         </p>
-        <div className="col" style={{ gap: 8, width: 'min(560px, 90%)' }}>
+        <div className="col" style={{ gap: 12, width: 'min(560px, 90%)' }}>
           {scenarios.map((s) => (
-            <button key={s.id} className="btn lg primary" onClick={() => api.player.open(s.id)}>
-              ▶ {s.name}
-            </button>
+            <div key={s.id} className="card" style={{ margin: 0, textAlign: 'left' }}>
+              <div style={{ fontWeight: 600, marginBottom: 2 }}>{s.name}</div>
+              {s.description && (
+                <div className="small muted" style={{ marginBottom: 8 }}>
+                  {s.description}
+                </div>
+              )}
+              <div className="row" style={{ flexWrap: 'wrap' }}>
+                {PLAY_MODES.map((m) => (
+                  <button
+                    key={m.id}
+                    className={`btn ${m.id === 'normal' ? 'primary' : ''}`}
+                    title={m.hint}
+                    onClick={() => api.player.open(s.id, m.opts)}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
           {scenarios.length === 0 && <div className="banner warn">シナリオがまだありません。</div>}
         </div>
