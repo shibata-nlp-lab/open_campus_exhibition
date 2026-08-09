@@ -18,6 +18,7 @@ import { CONTENT_LABELS, DEFAULT_AUTO_SEC, emptyAudio, uid } from '../defaults';
 import { api, errText } from '../lib/api';
 import { AssetPicker, Field, NumberField, Toggle } from './common';
 import { shiftIndex } from '../lib/reorder';
+import { formatIndexList, formatSecList, parseIndexList, parseSecList } from '../lib/numberList';
 
 type Patch<T> = (fn: (c: T) => void) => void;
 
@@ -124,15 +125,47 @@ function ScreenAudioFields<T extends Interactive1Content | Interactive2Content>(
   );
 }
 
-/** 「1,3,5」のような入力を 0 起点の位置に直す（画面では 1 番目から数える） */
-function parseIndexList(text: string): number[] {
-  return text
-    .split(/[^0-9]+/)
-    .filter(Boolean)
-    .map((n) => Number(n) - 1)
-    .filter((n) => n >= 0);
+/**
+ * 「1, 3, 5」のようなカンマ区切りを打ち込む欄。
+ *
+ * 保存する値（数値の配列）から毎回文字列を作り直すと、区切りを打った瞬間に消えて
+ * **2つ目以降が入力できません**（"1, " → [0] → "1"）。
+ * 打っている間は入力そのものを持ち、保存だけ数値に直す。
+ */
+function NumberListField({
+  value,
+  onChange,
+  parse,
+  format,
+  placeholder,
+}: {
+  value: number[];
+  onChange: (v: number[]) => void;
+  parse: (text: string) => number[];
+  format: (list: number[]) => string;
+  placeholder: string;
+}) {
+  const [text, setText] = useState(() => format(value));
+  // 別のコンテンツに切り替えたときは、そちらの値に追従する
+  const [seen, setSeen] = useState(value);
+  if (seen !== value && format(value) !== format(parse(text))) {
+    setSeen(value);
+    setText(format(value));
+  }
+
+  return (
+    <input
+      className="input mono"
+      placeholder={placeholder}
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        onChange(parse(e.target.value));
+      }}
+      onBlur={() => setText(format(parse(text)))}
+    />
+  );
 }
-const formatIndexList = (list: number[]) => (list ?? []).map((n) => n + 1).join(', ');
 
 /** 体験①の自動モード設定（来場者の代わりに何を入力し、どの単語を見せるか） */
 function AutoInteractive1Fields({ c, patch }: { c: Interactive1Content; patch: Patch<Interactive1Content> }) {
@@ -150,15 +183,36 @@ function AutoInteractive1Fields({ c, patch }: { c: Interactive1Content; patch: P
       </Field>
       <Field
         label="ベクトル画面で順に見せる単語（例：1, 3, 5）"
-        hint="1 が先頭の単語です。1つ見せるごとに上の「ベクトル化の画面」の待ち時間だけ止まり、最後まで行ったら次のコンテンツへ進みます。空なら先頭の単語だけを見せます。"
+        hint="1 が先頭の単語です。空なら先頭の単語だけを見せます。数字以外は区切りとして扱うので、読点でもスペースでも構いません。"
       >
-        <input
-          className="input mono"
+        <NumberListField
+          value={c.autoTokenIndexes ?? []}
+          onChange={(v) => patch((x) => void (x.autoTokenIndexes = v))}
+          parse={parseIndexList}
+          format={formatIndexList}
           placeholder="1, 3, 5"
-          value={formatIndexList(c.autoTokenIndexes ?? [])}
-          onChange={(e) => patch((x) => void (x.autoTokenIndexes = parseIndexList(e.target.value)))}
         />
       </Field>
+      <Field
+        label="単語ごとの見せる時間（例：3, 5, 2）"
+        hint="上の単語と同じ順に並べます。書かなかったぶんは下の「既定の間隔」を使うので、1語だけ長く見せることもできます。音声は待ちません。"
+      >
+        <NumberListField
+          value={c.autoFocusSecs ?? []}
+          onChange={(v) => patch((x) => void (x.autoFocusSecs = v))}
+          parse={parseSecList}
+          format={formatSecList}
+          placeholder="3, 5, 2"
+        />
+      </Field>
+      <NumberField
+        label="既定の間隔（上で指定しなかった単語）"
+        value={c.autoFocusSec ?? DEFAULT_AUTO_SEC}
+        max={600}
+        suffix="秒（音声は待ちません。鳴っている間もこの間隔で移ります）"
+        hint="最後の単語まで見せたあと、次のコンテンツへ進むときだけは「ベクトル化の画面」の待ち時間を使い、音声が鳴り終わるのを待ちます。"
+        onChange={(v) => patch((x) => void (x.autoFocusSec = v))}
+      />
     </>
   );
 }

@@ -97,6 +97,9 @@ export function migrate(config: AppConfig): AppConfig {
       c.screenAutoSec = { ...defaultInteractive1AutoSec(), ...(c.screenAutoSec ?? {}) };
       c.autoText ??= c.examples?.[0] ?? '';
       if (!Array.isArray(c.autoTokenIndexes)) c.autoTokenIndexes = [];
+      // フォーカス移動の間隔は後から分けたので、それまで使っていた値を引き継ぐ
+      c.autoFocusSec ??= c.screenAutoSec?.vectors ?? DEFAULT_AUTO_SEC;
+      if (!Array.isArray(c.autoFocusSecs)) c.autoFocusSecs = [];
       c.neighbourSource ??= 'curated';
       c.tokenizerMode ??= 'gpt';
       c.embeddingSource ??= 'openai';

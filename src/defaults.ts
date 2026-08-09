@@ -139,6 +139,8 @@ export function createContent(type: ContentType): Content {
         screenAutoSec: defaultInteractive1AutoSec(),
         autoText: '今日はオープンキャンパスに来ました',
         autoTokenIndexes: [],
+        autoFocusSec: DEFAULT_AUTO_SEC,
+        autoFocusSecs: [],
       } as Interactive1Content;
     case 'interactive2':
       return {

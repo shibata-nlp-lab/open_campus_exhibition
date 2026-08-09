@@ -159,7 +159,7 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
   const showId = content.showTokenId ?? true;
 
   // 画面ごとの音声。phase が変わると前の画面の音は止まり、次の音に切り替わる
-  const audio = useAudio(content.screenAudio?.[phase]);
+  const audio = useAudio(content.screenAudio?.[phase], undefined, phase);
 
   /* ---------- 自動モード ---------- */
   const { auto } = useAuto();
@@ -200,7 +200,8 @@ export default function Interactive1Step({ content, config, onFinish }: StepProp
   useAutoTimer({
     enabled: auto && !busy && moreFocus,
     audioEnded: true,
-    sec: autoSec,
+    // 単語ごとに時間を決めていればそれを使い、無ければ共通の間隔
+    sec: content.autoFocusSecs?.[autoFocus] ?? content.autoFocusSec,
     key: `focus_${autoFocus}`,
     fire: () => {
       const at = autoFocus + 1;
