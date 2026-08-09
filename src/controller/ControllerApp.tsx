@@ -98,6 +98,16 @@ export default function ControllerApp() {
           <div className="small muted">{state.scenarioName}</div>
           <h1>{current?.name ?? '—'}</h1>
           {state.standby && <span className="chip" style={{ background: '#37291a', color: '#ffd9a1' }}>待機画面を表示中</span>}
+          {/* 音が出ないのを不具合と勘違いさせないため、止めている間は必ず出す */}
+          {state.muteAll && (
+            <span
+              className="chip"
+              title="M キーで元に戻せます"
+              style={{ background: '#37291a', color: '#ffd9a1' }}
+            >
+              🔇 音声を停止中（M で再開）
+            </span>
+          )}
           <div className="small muted">
             {current ? CONTENT_LABELS[current.type] : ''}
             {state.detail ? ` — ${state.detail}` : ''}
@@ -252,6 +262,7 @@ export default function ControllerApp() {
               ['←', '戻る'],
               ['N / P', '次 / 前のコンテンツ'],
               ['S', '待機画面の表示 / 解除'],
+              ['M', '音声の停止 / 再開'],
               ['R', '最初から'],
               ['F', '全画面切替'],
               ['Esc', '終了'],

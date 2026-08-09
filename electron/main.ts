@@ -41,6 +41,7 @@ import {
   preparePredictModel,
   type PredictModelId,
 } from './predictNext';
+import { deleteStoredModel, listStoredModels } from './modelFiles';
 import type { ApiResult, AppConfig, ClearResult, DisplayInfo, PlaybackCommand, PlaybackState, Role } from '../src/types';
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
@@ -180,6 +181,8 @@ function attachControllerKeys(win: BrowserWindow) {
         return handled(() => sendToPlayer({ type: 'prev' }));
       case 's':
         return handled(() => sendToPlayer({ type: 'standby' }));
+      case 'm':
+        return handled(() => sendToPlayer({ type: 'muteAll' }));
       case 'r':
         return handled(() => sendToPlayer({ type: 'restart' }));
       case 'f':
@@ -219,7 +222,7 @@ function createControllerWindow(scenarioId: string) {
   });
 }
 
-function createPlayerWindow(scenarioId: string, standby = false) {
+function createPlayerWindow(scenarioId: string, standby = false, muted = false) {
   const cfg = loadConfig();
   if (playerWindow && !playerWindow.isDestroyed()) {
     playerWindow.focus();
@@ -241,7 +244,9 @@ function createPlayerWindow(scenarioId: string, standby = false) {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), sandbox: false },
   });
   playerWindow.loadURL(
-    rendererUrl(`/player?scenario=${encodeURIComponent(scenarioId)}${standby ? '&standby=1' : ''}`)
+    rendererUrl(
+      `/player?scenario=${encodeURIComponent(scenarioId)}${standby ? '&standby=1' : ''}${muted ? '&mute=1' : ''}`
+    )
   );
 
   playerWindow.once('ready-to-show', () => {
@@ -462,13 +467,16 @@ function registerIpc() {
     }))
   );
   ipcMain.handle('predict:prepare', (_e, id: PredictModelId) => asResult(() => preparePredictModel(id)));
+  /* --- ダウンロード済みモデルの掃除（展示PCの空き容量のため） --- */
+  ipcMain.handle('models:list', () => listStoredModels());
+  ipcMain.handle('models:delete', (_e, rel: string) => asResult(async () => deleteStoredModel(rel)));
   ipcMain.handle('predict:nextTokens', (_e, args: { text: string; topK: number; id: PredictModelId }) =>
     asResult(() => nextTokensLocal(args.text, args.topK, args.id))
   );
 
   /* --- ウィンドウ / ディスプレイ --- */
-  ipcMain.handle('player:open', (_e, args: { scenarioId: string; standby?: boolean }) =>
-    createPlayerWindow(args.scenarioId, args.standby)
+  ipcMain.handle('player:open', (_e, args: { scenarioId: string; standby?: boolean; muted?: boolean }) =>
+    createPlayerWindow(args.scenarioId, args.standby, args.muted)
   );
   ipcMain.handle('player:close', () => {
     playerWindow?.close();

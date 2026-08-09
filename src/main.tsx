@@ -10,7 +10,13 @@ function Root() {
   const [route] = hash.split('?');
   if (route.startsWith('/player')) {
     const params = new URLSearchParams(hash.split('?')[1] ?? '');
-    return <PlayerApp scenarioId={params.get('scenario')} startStandby={params.get('standby') === '1'} />;
+    return (
+      <PlayerApp
+        scenarioId={params.get('scenario')}
+        startStandby={params.get('standby') === '1'}
+        startMuted={params.get('mute') === '1'}
+      />
+    );
   }
   if (route.startsWith('/controller')) return <ControllerApp />;
   return <SettingsApp />;
