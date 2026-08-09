@@ -130,6 +130,8 @@ export function createContent(type: ContentType): Content {
         prompt: '文の続きをAIに予測させてみよう',
         placeholder: '例）今日の天気は',
         examples: ['今日の天気は', '吾輩は猫で', '日本の首都は'],
+        predictSource: 'openai',
+        llmjpNextSize: '150m',
         topK: 5,
         maxSteps: 12,
         autoPickTop: false,

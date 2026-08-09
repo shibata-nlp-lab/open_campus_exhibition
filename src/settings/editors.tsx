@@ -643,6 +643,86 @@ function LlmJpPicker({ c, patch }: { c: Interactive1Content; patch: Patch<Intera
   );
 }
 
+/** 体験②で動かす llm-jp のサイズ選択と、事前ダウンロード */
+function LlmJpNextPicker({ c, patch }: { c: Interactive2Content; patch: Patch<Interactive2Content> }) {
+  const [models, setModels] = useState<Array<{ size: string; label: string; mb: number; ready: boolean }>>([]);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const refresh = () => api.llmjp.nextModels().then(setModels);
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  const size = c.llmjpNextSize ?? '150m';
+  const status = models.find((m) => m.size === size);
+
+  return (
+    <>
+      <Field
+        label="モデルのサイズ"
+        helpTone="ok"
+        help={
+          <>
+            大きいほど候補が「らしく」なりますが、ダウンロードも1手あたりの時間も増えます。
+            手元（Apple Silicon）で測った結果は次のとおりです。
+            <br />
+            <span className="mono">150m ： 日本の首都は → 東京 57% ／ 次の単語を → 含む・使用・生成</span>
+            <br />
+            <span className="mono">980m ： 日本の首都は → 東京 77% ／ 次の単語を → 生成 23%・予測 6%</span>
+            <br />
+            展示で「次の語を予測している」と見せる目的なら、待ち時間の短い <strong>150m</strong> でも十分です。
+            候補の納得感を優先するなら 980m（1手 0.2〜0.5 秒・約1GB）を選んでください。
+            <br />
+            サイズを変えたら、下のボタンでそのサイズを取得してください（サイズごとに別のファイルです）。
+          </>
+        }
+      >
+        <select
+          className="select"
+          value={size}
+          onChange={(e) => patch((x) => void (x.llmjpNextSize = e.target.value as Interactive2Content['llmjpNextSize']))}
+        >
+          {models.map((m) => (
+            <option key={m.size} value={m.size}>
+              {m.label} — {m.mb}MB{m.ready ? '（取得済み）' : ''}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <div className="row" style={{ marginBottom: 14 }}>
+        <button
+          className="btn"
+          disabled={busy || status?.ready}
+          onClick={async () => {
+            setBusy(true);
+            setMsg(null);
+            try {
+              await api.llmjp.prepareNext(size);
+              await refresh();
+              setMsg('ダウンロードが完了しました。');
+            } catch (e) {
+              setMsg(errText(e));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {status?.ready ? '取得済み' : busy ? 'ダウンロード中…' : `モデルを事前ダウンロード（約${status?.mb ?? 0}MB）`}
+        </button>
+        {busy && <div className="spin" />}
+      </div>
+      {msg && <div className="banner ok" style={{ marginBottom: 14 }}>{msg}</div>}
+      {status && !status.ready && (
+        <div className="banner warn" style={{ marginBottom: 14 }}>
+          未取得です。この状態だと<strong>来場者が最初に試したときにダウンロードが始まり</strong>、
+          数分待たせることになります。展示当日に困らないよう、事前に取得しておいてください。
+        </div>
+      )}
+    </>
+  );
+}
+
 function Interactive1Editor({ c, patch }: { c: Interactive1Content; patch: Patch<Interactive1Content> }) {
   return (
     <>
@@ -827,6 +907,39 @@ function Interactive2Editor({ c, patch }: { c: Interactive2Content; patch: Patch
       <div className="banner warn" style={{ marginBottom: 14 }}>
         Chat Completions の <span className="mono">top_logprobs</span> を使い、次トークンの候補と確率を1トークンずつ表示します。
       </div>
+      <Field
+        label="次の単語の確率の取得元"
+        helpTone={(c.predictSource ?? 'openai') === 'openai' ? 'warn' : 'ok'}
+        help={
+          (c.predictSource ?? 'openai') === 'llmjp' ? (
+            <>
+              日本語モデル llm-jp-3 をこのPC内で動かします。APIキーも通信も要らず、
+              1手あたり 0.05〜0.5 秒（サイズによる）で返ります。日本語のモデルなので候補が語のかたまりで出て、
+              GPT より読みやすくなります（<span className="mono">日本の首都は → 東京 57%</span>）。
+              <br />
+              体験①の「llm-jp の埋め込み層」とは別物です。あちらは表を引くだけ、こちらはモデル本体を動かします。
+              初回だけモデルのダウンロードが要るので、下のボタンで先に取得してください。
+            </>
+          ) : (
+            <>
+              OpenAI の <span className="mono">top_logprobs</span> を使います。APIキーと通信が必要で、
+              会場のネットワークが不安定だとオフライン簡易モードに落ちます。
+              英語圏のモデルなので、日本語の候補は1文字ずつに割れがちです。
+            </>
+          )
+        }
+      >
+        <select
+          className="select"
+          value={c.predictSource ?? 'openai'}
+          onChange={(e) => patch((x) => void (x.predictSource = e.target.value as Interactive2Content['predictSource']))}
+        >
+          <option value="openai">OpenAI Chat Completions（要APIキー）</option>
+          <option value="llmjp">llm-jp-3（日本語モデル・APIキー不要）</option>
+        </select>
+      </Field>
+      {(c.predictSource ?? 'openai') === 'llmjp' && <LlmJpNextPicker c={c} patch={patch} />}
+
       <Field label="来場者への問いかけ">
         <input className="input" value={c.prompt} onChange={(e) => patch((x) => void (x.prompt = e.target.value))} />
       </Field>

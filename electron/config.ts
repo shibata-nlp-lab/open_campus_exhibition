@@ -103,6 +103,8 @@ export function migrate(config: AppConfig): AppConfig {
     }
     if (c.type === 'interactive2') {
       c.screenAudio = { ...emptyInteractive2Audio(), ...(c.screenAudio ?? {}) };
+      c.predictSource ??= 'openai';
+      c.llmjpNextSize ??= '150m';
     }
     if (c.type === 'branch') {
       // 戻り先は当初 1 つだけ（targetContentId / goLabel）だった。複数置けるようにしたので、
